@@ -41,4 +41,6 @@ dependencies = [
     "drf-spectacular>=0.30.0",
     "django-unfold>=0.105.0",
     "django-environ>=0.14.0",
+    "pillow>=12.3.0",
+    "django-cors-headers>=4.9.0",
 ]
