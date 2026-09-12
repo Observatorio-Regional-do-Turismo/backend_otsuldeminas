@@ -283,7 +283,7 @@ def carregar_vinc_pub(arquivoColetado : ArquivoColetado):
             except Exception as e:
                 print(cnae_codigo)
                 print(e)
-                raise
+                raise e
     
     
     arquivoColetado.status = "LOADED"
