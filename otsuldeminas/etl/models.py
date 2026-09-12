@@ -36,3 +36,41 @@ class ArquivoColetado(models.Model):
         return f"{self.nome}.zip"
 
 
+class LogOperacao(models.Model):
+    operacao = models.CharField(
+        max_length=30,
+    )
+
+    arquivo = models.CharField(
+        max_length=50,
+    )
+
+    data_referencia = models.CharField(
+        max_length=15,
+    )
+
+    sucesso = models.BooleanField(
+        default=False,
+    )
+
+    erro = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    systimestamp = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
+        db_table = "log_operacao"
+        ordering = ["-systimestamp"]
+        verbose_name = "Log de operação"
+        verbose_name_plural = "Logs de operação"
+
+    def __str__(self):
+        return (
+            f"{self.operacao} - "
+            f"{self.arquivo} - "
+            f"{self.data_referencia}"
+        )

@@ -2,6 +2,7 @@ from ftplib import FTP
 from django.conf import settings
 from django.db.models import F
 from etl.models import ArquivoColetado
+from etl.utils import registrar_log
 from cadastros.models import CNAE, Municipio
 from caged.models import SaldoMensalCaged
 from rais.models import EstoqueAnual, EstoqueMensal
@@ -81,7 +82,7 @@ def baixar_caged(arquivoColetado: ArquivoColetado):
     return True
 
 def filtrar_caged(arquivoColetado: ArquivoColetado):
-    
+    linhas_filtradas = 0
     lista_ibge = list(Municipio.objects.values_list("codigo_ibge", flat=True))
     cnaes = list(CNAE.objects.values_list("codigo", flat=True)) #  Cidade.objects.values_list("nome")
 
@@ -100,6 +101,7 @@ def filtrar_caged(arquivoColetado: ArquivoColetado):
     mask = chunk[chunk.columns[3]].isin(lista_ibge) & chunk[chunk.columns[5]].str[0:5].isin(cnaes)
     filtrado = chunk[mask]
     filtrado.to_csv(saida, mode="w", index=False, header=True, encoding="latin-1")
+    linhas_filtradas += len(filtrado)
     
     while True:
         try:
@@ -107,13 +109,17 @@ def filtrar_caged(arquivoColetado: ArquivoColetado):
             mask = chunk[chunk.columns[3]].isin(lista_ibge) & chunk[chunk.columns[5]].str[0:5].isin(cnaes)
             filtrado = chunk[mask]
             filtrado.to_csv(saida, mode="a", index=False, header=False, encoding="latin-1")
+            linhas_filtradas += len(filtrado)
         except StopIteration:
     
             break
-    print("filtrou")
-    
+    print(f"filtrou {linhas_filtradas} linhas")
+    if linhas_filtradas == 0:
+        raise RuntimeError(f"Nenhuma linha filtrada para o arquivo {nome}.")
+      
     os.remove(arquivoColetado.path_extraido)
     arquivoColetado.path_extraido = ""
+    arquivoColetado.linhas_filtradas = linhas_filtradas
     arquivoColetado.status = "FILTERED"
     arquivoColetado.save()
 

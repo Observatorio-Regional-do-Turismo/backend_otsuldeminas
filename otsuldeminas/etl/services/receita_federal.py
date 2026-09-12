@@ -179,6 +179,9 @@ def filtrar_arquivo_rf(
 
                     writer.writerow(out_row)
                     total_out += 1
+        
+        if total_out == 0:
+            raise RuntimeError(f"Nenhuma linha filtrada para o arquivo {arquivo_coletado.nome}.")
 
         arquivo_coletado.path_filtrado = str(filtered_path)
         arquivo_coletado.linhas_filtradas = total_out

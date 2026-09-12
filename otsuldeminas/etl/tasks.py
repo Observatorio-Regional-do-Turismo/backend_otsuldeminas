@@ -6,6 +6,7 @@ from .services.receita_federal import baixar_arquivo_rf, extrair_arquivo_rf, fil
 from .services.rais import baixar_rais, filtrar_vinc_pub, carregar_vinc_pub, filtrar_estab_pub, carregar_estab_pub, carregar_saldos_mensais
 from .services.caged import baixar_caged, filtrar_caged, carregar_caged_mov, carregar_caged_for, carregar_caged_exc, carregar_saldos_mensais_temporarios
 from .models import ArquivoColetado
+from .utils import registrar_log
 
 @shared_task(
     bind=True,
@@ -41,15 +42,35 @@ def task_baixar_arquivo_rf(
                                 ano_mes=ano_mes,
                                 arquivo_coletado=arquivo_coletado
                             )
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=nome_arquivo_local,
+            data_referencia=ano_mes,
+            sucesso=True,
+        )
         return arquivo_coletado.id
         
     except (Timeout, ConnectionError, SoftTimeLimitExceeded):
         # Essas exceções são tratadas pelo autoretry_for automaticamente
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=nome_arquivo_local,
+            data_referencia=ano_mes,
+            sucesso=False,
+            erro="Timeout, ConnectionError ou SoftTimeLimitExceeded",
+        )
         raise
 
     except HTTPError as e:
         if e.response.status_code == 404: #a rquivo não encontrado
             print("Ih rapaiz")
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=nome_arquivo_local,
+                data_referencia=ano_mes,
+                sucesso=False,
+                erro="Arquivo não encontrado",
+            )
             raise self.retry(
             countdown= 7 * 24 * 60 * 60,  # tenta de novo em uma semana
             max_retries=4,           # tenta por um mes
@@ -57,12 +78,26 @@ def task_baixar_arquivo_rf(
         raise e  # re-raise para outras exceções HTTP
     except RuntimeError as e:
         print(e)
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=nome_arquivo_local,
+            data_referencia=ano_mes,
+            sucesso=False,
+            erro=str(e),
+        )
         raise self.retry(
             countdown= 5 * 60,  # tenta de novo em 10 minutos
             max_retries=5,           
         )
     except Exception as e:
         print(e)
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=nome_arquivo_local,
+            data_referencia=ano_mes,
+            sucesso=False,
+            erro=str(e),
+        )
         raise self.retry(
             countdown= 10 * 60,  # tenta de novo em 10 minutos
             max_retries=5,           
@@ -78,9 +113,22 @@ def task_extrair_arquivo_rf(
     arquivoColetado = ArquivoColetado.objects.get(id=id_arquivoColetado)
     try:
         arquivoColetado = extrair_arquivo_rf(arquivoColetado)
+        registrar_log(
+            operacao="EXTRACAO",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=True,
+        )
         return arquivoColetado.id
     except RuntimeError as e:
         print(e)
+        registrar_log(
+            operacao="EXTRACAO",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=False,
+            erro=str(e),
+        )
         arquivoColetado.status = "ERROR"
         arquivoColetado.msg = str(e)
         arquivoColetado.save()
@@ -96,9 +144,22 @@ def task_filtrar_dados_rf(
     arquivoColetado = ArquivoColetado.objects.get(id=id_arquivoColetado)
     try:
         arquivoColetado = filtrar_arquivo_rf(arquivoColetado)
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=True,
+        )
         return arquivoColetado.id
     except RuntimeError as e:
         print(e)
+        registrar_log(
+            operacao="FILTRAGEM",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=False,
+            erro=str(e),
+        )
         arquivoColetado.status = "ERROR"
         arquivoColetado.msg += "\n"
         arquivoColetado.msg += str(e)
@@ -115,9 +176,22 @@ def task_carregar_dados_rf(
     arquivoColetado = ArquivoColetado.objects.get(id=id_arquivoColetado)
     try:
         arquivoColetado = carregar_arquivo_rf(arquivoColetado)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=True,
+        )
         return arquivoColetado.id
     except RuntimeError as e:
         print(e)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=False,
+            erro=str(e),
+        )
         arquivoColetado.status = "ERROR"
         arquivoColetado.msg += "\n"
         arquivoColetado.msg += str(e)
@@ -268,19 +342,33 @@ def task_coletar_vinc_pub(
     ano: int
     ):
     
+    arquivo_nome = "RAIS_VINC_PUB_MG_ES_RJ.7z"
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-        nome="RAIS_VINC_PUB_MG_ES_RJ.7z",
+        nome=arquivo_nome,
         ano=ano,
     )
     arquivo_coletado.status = "PENDING"
     arquivo_coletado.save()
     
     try:
-        baixar_rais(arquivoColetado=arquivo_coletado)      
+        baixar_rais(arquivoColetado=arquivo_coletado) 
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=True,
+        )    
     except Exception as e:
         arquivo_coletado.status = "FAILED"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
         raise 
     
     # id_arquivo_coletado = task_baixar_rais.apply(
@@ -294,12 +382,46 @@ def task_coletar_vinc_pub(
     
     try:
         filtrar_vinc_pub(arquivo_coletado)
-        carregar_vinc_pub(arquivo_coletado)
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=True,
+        )
     except Exception as e:
         print(e)
         arquivo_coletado.status = "ERROR"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+
+    try:
+        carregar_vinc_pub(arquivo_coletado)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
         raise
 
     
@@ -312,21 +434,77 @@ def task_coletar_estab_pub(
     ano: int
     ):
     
+    arquivo_nome = "RAIS_ESTAB_PUB.7z"
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-        nome="RAIS_ESTAB_PUB.7z",
+        nome=arquivo_nome,
         ano=ano,
     )
     arquivo_coletado.status = "PENDING"
     arquivo_coletado.save()
+    
+    try:
+        baixar_rais(arquivoColetado=arquivo_coletado) 
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=True,
+        )    
+    except Exception as e:
+        arquivo_coletado.status = "FAILED"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
+        raise 
 
     try:
         filtrar_estab_pub(arquivo_coletado)
-        carregar_estab_pub(arquivo_coletado)
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=True,
+        )
     except Exception as e:
         print(e)
         arquivo_coletado.status = "ERROR"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+    
+    try:
+        carregar_estab_pub(arquivo_coletado)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
         raise
 
 @shared_task(
@@ -338,8 +516,21 @@ def task_carregar_saldos_mensais(
     ):
     try:
         carregar_saldos_mensais(ano)
+        registrar_log(
+            operacao="CARGA",
+            arquivo="SALDOS_MENSAIS",
+            data_referencia=str(ano),
+            sucesso=True,
+        )
     except Exception as e:
         print(e)
+        registrar_log(
+            operacao="CARGA",
+            arquivo="SALDOS_MENSAIS",
+            data_referencia=str(ano),
+            sucesso=False,
+            erro=str(e),
+        )
         raise
 
 @shared_task(
@@ -347,7 +538,14 @@ def task_carregar_saldos_mensais(
 )
 def task_finalizar_coleta_rais(
         self,
+        ano: int,
     ):
+    registrar_log(
+        operacao="FINALIZACAO",
+        arquivo="RAIS",
+        data_referencia=str(ano),
+        sucesso=True,
+    )
     print("Coleta dos arquivos RAIS finalizada.")
 
 @shared_task(
@@ -366,7 +564,7 @@ def task_coletar_arquivos_rais(
         task_coletar_vinc_pub.si(ano=ano),
         task_coletar_estab_pub.si(ano=ano),
         task_carregar_saldos_mensais.si(ano=ano),
-        task_finalizar_coleta_rais.si(),
+        task_finalizar_coleta_rais.si(ano=ano),
     )
     async_result = ch.apply_async()
     print(f"Coleta dos arquivos RAIS {ano} disparada: {async_result.id}")
@@ -481,8 +679,10 @@ def task_coletar_caged_mov(
     mes: int,
 ):
     
+    arquivo_nome = "CAGEDMOV"
+    data_referencia = f"{ano:04d}-{mes:02d}"
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-            nome=f"CAGEDMOV",
+            nome=arquivo_nome,
             ano=ano,
             mes=mes,
         )
@@ -491,14 +691,30 @@ def task_coletar_caged_mov(
     arquivo_coletado.save()
     
     try:
-            baixar_caged(arquivoColetado=arquivo_coletado)
-            
+        baixar_caged(arquivoColetado=arquivo_coletado)    
+        
+        registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=True,
+            )
+        
     except Exception as e:
         arquivo_coletado.status = "FAILED"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        
         raise
-    
+       
     # id_arquivo_coletado = task_baixar_caged.apply(
     #                         kwargs={
     #                             'ano':ano,
@@ -511,12 +727,52 @@ def task_coletar_caged_mov(
     
     try:
         filtrar_caged(arquivo_coletado)
-        carregar_caged_mov(arquivo_coletado)
+        
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+        
     except Exception as e:
         print(e)
         arquivo_coletado.status = "ERROR"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+ 
+    try:
+        carregar_caged_mov(arquivo_coletado)
+        
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+        
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
         raise
     
 
@@ -528,9 +784,10 @@ def task_coletar_caged_for(
     ano: int,
     mes: int,
 ):
-
+    arquivo_nome = "CAGEDFOR"
+    data_referencia = f"{ano:04d}-{mes:02d}"
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-            nome=f"CAGEDFOR",
+            nome=arquivo_nome,
             ano=ano,
             mes=mes,
         )
@@ -539,24 +796,81 @@ def task_coletar_caged_for(
     arquivo_coletado.save()
     
     try:
-            baixar_caged(arquivoColetado=arquivo_coletado)
+        baixar_caged(arquivoColetado=arquivo_coletado)
+        
+        registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=True,
+            )
             
     except Exception as e:
         
         if(str(e).startswith("550")): # arquivo não encontrado
             print(f"Arquivo CAGED FOR {ano}-{mes} não encontrado. Pulando etapa de coleta.")
+            
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=f"{e} + Arquivo não encontrado. Pulando etapa de coleta.",
+            )
             return None
         else:
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=str(e),
+            )
             raise e        
     
     try:
         filtrar_caged(arquivo_coletado)
-        carregar_caged_for(arquivo_coletado)
+        
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
     except Exception as e:
         print(e)
         arquivo_coletado.status = "ERROR"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+    
+    try:
+        carregar_caged_for(arquivo_coletado)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
         raise
 
 
@@ -568,8 +882,10 @@ def task_coletar_caged_exc(
     ano: int,
     mes: int,
 ):
+    arquivo_nome = "CAGEDEXC"
+    data_referencia = f"{ano:04d}-{mes:02d}"
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-            nome=f"CAGEDEXC",
+            nome=arquivo_nome,
             ano=ano,
             mes=mes,
         )
@@ -582,18 +898,66 @@ def task_coletar_caged_exc(
     except Exception as e:
         if(str(e).startswith("550")): # arquivo não encontrado
             print(f"Arquivo CAGED EXC {ano}-{mes} não encontrado. Pulando etapa de coleta.")
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=f"{e} + Arquivo não encontrado. Pulando etapa de coleta.",
+            )
             return None
         else:
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=str(e),
+            )
             raise e
     
     try:
         filtrar_caged(arquivo_coletado)
-        carregar_caged_exc(arquivo_coletado)
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
     except Exception as e:
         print(e)
         arquivo_coletado.status = "ERROR"
         arquivo_coletado.msg = str(e)
         arquivo_coletado.save()
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise   
+
+    try:
+        carregar_caged_exc(arquivo_coletado)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
         raise   
  
     
@@ -605,10 +969,23 @@ def task_carregar_saldos_mensais_temporarios(
     year:int,
     month:int,
 ):
+    data_referencia = f"{year:04d}-{month:02d}"
     try:
         carregar_saldos_mensais_temporarios(year, month)
+        registrar_log(
+            operacao="CARGA_SALDOS_MENS_TEMP",
+            arquivo="",
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
     except Exception as e:
         print(e)
+        registrar_log(
+            operacao="CARGA_SALDOS_MENS_TEMP",
+            arquivo="",
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
         raise 
 
 
@@ -617,7 +994,15 @@ def task_carregar_saldos_mensais_temporarios(
 )
 def task_finalizar_coleta_caged(
         self,
+        ano: int,
+        mes: int,
     ):
+    registrar_log(
+        operacao="FINALIZACAO",
+        arquivo="CAGED",
+        data_referencia=f"{ano:04d}-{mes:02d}",
+        sucesso=True,
+    )
     print("Coleta dos arquivos CAGED finalizada.")
 
 
@@ -643,7 +1028,7 @@ def task_coletar_arquivos_caged(
         task_coletar_caged_for.si(ano=ano, mes=mes),
         task_coletar_caged_exc.si(ano=ano, mes=mes),
         task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
-        task_finalizar_coleta_caged.si(),
+        task_finalizar_coleta_caged.si(ano=ano, mes=mes),
     )
     async_result = ch.apply_async()
     print(f"Coleta dos arquivos CAGED {ano}-{mes} disparada: {async_result.id}")    

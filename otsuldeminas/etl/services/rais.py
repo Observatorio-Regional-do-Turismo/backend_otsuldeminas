@@ -75,7 +75,7 @@ def baixar_rais(arquivoColetado : ArquivoColetado) -> str:
 
 def filtrar_vinc_pub(arquivoColetado : ArquivoColetado):
     
-    
+    linhas_filtradas = 0
     lista_ibge = list(Municipio.objects.values_list("codigo_ibge", flat=True))
      
     path_extraido = arquivoColetado.path_extraido
@@ -108,6 +108,7 @@ def filtrar_vinc_pub(arquivoColetado : ArquivoColetado):
     filtrado = chunk[mask]
     # print(len(filtrado))
     filtrado.to_csv(saida, mode="w", index=False, header=True, encoding="utf-8")
+    linhas_filtradas += len(filtrado)
     
     while True:
         try:
@@ -118,19 +119,23 @@ def filtrar_vinc_pub(arquivoColetado : ArquivoColetado):
             filtrado = chunk[mask]
             # print(len(filtrado))
             filtrado.to_csv(saida, mode="a", index=False, header=False, encoding="utf-8")
-        except StopIteration:
-    
+            linhas_filtradas += len(filtrado)
+        except StopIteration:   
             break
-    print("filtrou")
-    
+        
+    print(f"filtrou {linhas_filtradas} linhas")
+    if linhas_filtradas == 0:
+        raise RuntimeError(f"Nenhuma linha filtrada para o arquivo {arquivoColetado.nome}.")
+
     os.remove(arquivoColetado.path_extraido)
     arquivoColetado.path_extraido = ""
+    arquivoColetado.linhas_filtradas = linhas_filtradas
     arquivoColetado.status = "FILTERED"
     arquivoColetado.save()
 
 def filtrar_estab_pub(arquivoColetado : ArquivoColetado):
     
-    
+    linhas_filtradas = 0
     lista_ibge = list(Municipio.objects.values_list("codigo_ibge", flat=True))
      
     path_extraido = arquivoColetado.path_extraido
@@ -163,6 +168,7 @@ def filtrar_estab_pub(arquivoColetado : ArquivoColetado):
     mask = chunk[chunk.columns[10]].isin(lista_ibge) & chunk[chunk.columns[12]].str.startswith(cnaes, na=False)
     filtrado = chunk[mask]
     filtrado.to_csv(saida, mode="w", index=False, header=True, encoding="utf-8")
+    linhas_filtradas += len(filtrado)
     
     while True:
         try:
@@ -172,13 +178,17 @@ def filtrar_estab_pub(arquivoColetado : ArquivoColetado):
             mask = chunk[chunk.columns[10]].isin(lista_ibge) & chunk[chunk.columns[12]].str.startswith(cnaes, na=False)
             filtrado = chunk[mask]
             filtrado.to_csv(saida, mode="a", index=False, header=False, encoding="utf-8")
-        except StopIteration:
-    
+            linhas_filtradas += len(filtrado)
+        except StopIteration:   
             break
-    print("filtrou")
-    
+        
+    print(f"filtrou {linhas_filtradas} linhas")
+    if linhas_filtradas == 0:
+        raise RuntimeError(f"Nenhuma linha filtrada para o arquivo {arquivoColetado.nome}.")
+
     os.remove(arquivoColetado.path_extraido)
     arquivoColetado.path_extraido = ""
+    arquivoColetado.linhas_filtradas = linhas_filtradas
     arquivoColetado.status = "FILTERED"
     arquivoColetado.save()
     
