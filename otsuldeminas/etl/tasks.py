@@ -7,6 +7,10 @@ from .services.rais import baixar_rais, filtrar_vinc_pub, carregar_vinc_pub, fil
 from .services.caged import baixar_caged, filtrar_caged, carregar_caged_mov, carregar_caged_for, carregar_caged_exc, carregar_saldos_mensais_temporarios
 from .models import ArquivoColetado
 from .utils import registrar_log
+from caged.models import SaldoMensalCaged
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from django.db.models import Max
 
 @shared_task(
     bind=True,
@@ -152,6 +156,20 @@ def task_filtrar_dados_rf(
         )
         return arquivoColetado.id
     except RuntimeError as e:
+        print(e)
+        registrar_log(
+            operacao="FILTRAGEM",
+            arquivo=arquivoColetado.nome,
+            data_referencia=f"{arquivoColetado.ano}-{arquivoColetado.mes:02d}",
+            sucesso=False,
+            erro=str(e),
+        )
+        arquivoColetado.status = "ERROR"
+        arquivoColetado.msg += "\n"
+        arquivoColetado.msg += str(e)
+        arquivoColetado.save()
+        raise
+    except Exception as e:
         print(e)
         registrar_log(
             operacao="FILTRAGEM",
@@ -895,6 +913,12 @@ def task_coletar_caged_exc(
     
     try:
         baixar_caged(arquivoColetado=arquivo_coletado)
+        registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=True,
+            )
     except Exception as e:
         if(str(e).startswith("550")): # arquivo não encontrado
             print(f"Arquivo CAGED EXC {ano}-{mes} não encontrado. Pulando etapa de coleta.")
@@ -1006,29 +1030,81 @@ def task_finalizar_coleta_caged(
     print("Coleta dos arquivos CAGED finalizada.")
 
 
-@shared_task(
-    bind=True,
-)
-def task_coletar_arquivos_caged(
-        self,
-        **kwargs,
-):
-    if "ano" in kwargs:
+@shared_task(bind=True)
+def task_coletar_arquivos_caged(self, **kwargs):
+    # =========================
+    # MODO MANUAL: ano/mes explícitos
+    # =========================
+    if "ano" in kwargs and "mes" in kwargs:
         ano = kwargs["ano"]
-    else:
-        ano = date.today().year
-        
-    if "mes" in kwargs:
         mes = kwargs["mes"]
-    else:        
-        mes = date.today().month
-        
-    ch = chain(
-        task_coletar_caged_mov.si(ano=ano, mes=mes),
-        task_coletar_caged_for.si(ano=ano, mes=mes),
-        task_coletar_caged_exc.si(ano=ano, mes=mes),
-        task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
-        task_finalizar_coleta_caged.si(ano=ano, mes=mes),
+
+        ch = chain(
+            task_coletar_caged_mov.si(ano=ano, mes=mes),
+            task_coletar_caged_for.si(ano=ano, mes=mes),
+            task_coletar_caged_exc.si(ano=ano, mes=mes),
+            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
+            task_finalizar_coleta_caged.si(ano=ano, mes=mes),
+        )
+        async_result = ch.apply_async()
+        print(f"Coleta dos arquivos CAGED {ano}-{mes:02d} disparada: {async_result.id}")
+        return
+
+    # =========================
+    # MODO AUTOMÁTICO: intervalo de meses
+    # =========================
+    # 1. Último registro em SaldoMensalCaged
+    ultimo = SaldoMensalCaged.objects.aggregate(
+        ultimo_referencia=Max("referencia")
+    )["ultimo_referencia"]
+
+    if ultimo is None:
+        # Sem nenhum registro: define um ponto de partida (ajuste conforme sua regra)
+        ultimo = date(date.today().year, 1, 1)
+
+    # 2. Mês mais recente (já coletado)
+    mes_mais_recente = ultimo.replace(day=1)
+
+    # 3. Primeiro mês a processar = mês seguinte
+    data_inicio = mes_mais_recente + relativedelta(months=1)
+
+    # 4. Mês limite = mês atual - 2
+    hoje = date.today()
+    mes_atual_inicio = hoje.replace(day=1)
+    mes_limite = mes_atual_inicio - relativedelta(months=2)
+
+    # 5. Se o primeiro mês já for maior que o limite, não há nada a processar
+    if data_inicio > mes_limite:
+        print(
+            f"Não há meses para processar: "
+            f"primeiro_mês={data_inicio}, limite={mes_limite}"
+        )
+        return
+
+    # 6. Gerar lista de meses (ano, mes) entre data_inicio e mes_limite (inclusive)
+    meses_a_processar = []
+    current = data_inicio
+    while current <= mes_limite:
+        meses_a_processar.append((current.year, current.month))
+        current = current + relativedelta(months=1)
+
+    # 7. Construir uma chain única, onde cada elo é a chain de um mês
+    chain_de_meses = []
+    for ano, mes in meses_a_processar:
+        ch_mes = chain(
+            task_coletar_caged_mov.si(ano=ano, mes=mes),
+            task_coletar_caged_for.si(ano=ano, mes=mes),
+            task_coletar_caged_exc.si(ano=ano, mes=mes),
+            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
+            task_finalizar_coleta_caged.si(ano=ano, mes=mes),
+        )
+        chain_de_meses.append(ch_mes)
+
+    # Chain geral: meses em sequência
+    chain_geral = chain(*chain_de_meses)
+    async_result = chain_geral.apply_async()
+
+    print(
+        f"Coleta CAGED em sequência disparada para os meses "
+        f"{meses_a_processar}: {async_result.id}"
     )
-    async_result = ch.apply_async()
-    print(f"Coleta dos arquivos CAGED {ano}-{mes} disparada: {async_result.id}")    

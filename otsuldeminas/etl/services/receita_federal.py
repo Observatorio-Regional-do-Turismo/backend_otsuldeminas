@@ -146,7 +146,7 @@ def filtrar_arquivo_rf(
         with open(extracted_path, "rb") as rawdata:
             result = charset_normalizer.detect(rawdata.read(1000000))
             encoding = result['encoding'] or "latin-1"
-            if encoding.lower() == "ascii":
+            if encoding.lower() in {"ascii", "windows-1252", "cp1252"}:
                 encoding = "latin-1"
             print(encoding)
 
