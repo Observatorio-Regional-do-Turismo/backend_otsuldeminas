@@ -29,12 +29,6 @@ class ContatoSerializer(serializers.ModelSerializer):
 
 
 class GenericRelatedSerializerMixin:
-  """
-  Mixin for serializers whose model exposes `imagens` / `contatos`
-  (GenericRelation properties). Handles nested create/update so the
-  client can send images and contacts inline with the parent object.
-  """
-
   def create(self, validated_data):
     imagens_data = validated_data.pop("imagens", [])
     contatos_data = validated_data.pop("contatos", [])

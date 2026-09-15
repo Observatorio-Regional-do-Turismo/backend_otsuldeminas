@@ -19,15 +19,6 @@ class ContatoInline(GenericTabularInline):
 
 
 class CityScopedAdminMixin:
-  """
-  Restricts a ModelAdmin to a single Cidade for non-superuser staff,
-  based on the requesting user's GestorCidade assignment.
-
-  Set `cidade_lookup` to the ORM path from this model to a Cidade:
-  - "pk"     -> the model IS a Cidade (CidadeAdmin itself)
-  - "cidade" -> the model has a `cidade` FK (Evento, PontoTuristico)
-  """
-
   cidade_lookup = "cidade"
 
   def _managed_cidade(self, request):

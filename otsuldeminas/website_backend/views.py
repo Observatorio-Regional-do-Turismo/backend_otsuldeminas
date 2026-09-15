@@ -9,7 +9,7 @@ from .serializers import (
 )
 
 
-class EstadoViewSet(viewsets.ModelViewSet):
+class EstadoViewSet(viewsets.ReadOnlyModelViewSet):
   queryset = Estado.objects.all()
   serializer_class = EstadoSerializer
   filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -17,7 +17,7 @@ class EstadoViewSet(viewsets.ModelViewSet):
   ordering_fields = ["name"]
 
 
-class CidadeViewSet(viewsets.ModelViewSet):
+class CidadeViewSet(viewsets.ReadOnlyModelViewSet):
   queryset = Cidade.objects.select_related("state").all()
   serializer_class = CidadeSerializer
   filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -27,12 +27,14 @@ class CidadeViewSet(viewsets.ModelViewSet):
   def get_queryset(self):
     qs = super().get_queryset()
     estado_slug = self.request.query_params.get("estado")
+
     if estado_slug:
       qs = qs.filter(state__slug=estado_slug)
+
     return qs
 
 
-class EventoViewSet(viewsets.ModelViewSet):
+class EventoViewSet(viewsets.ReadOnlyModelViewSet):
   queryset = Evento.objects.select_related("cidade", "cidade__state").all()
   serializer_class = EventoSerializer
   filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -42,13 +44,18 @@ class EventoViewSet(viewsets.ModelViewSet):
   def get_queryset(self):
     qs = super().get_queryset()
     cidade_slug = self.request.query_params.get("cidade")
+
     if cidade_slug:
       qs = qs.filter(cidade__slug=cidade_slug)
+
     return qs
 
 
-class PontoTuristicoViewSet(viewsets.ModelViewSet):
-  queryset = PontoTuristico.objects.select_related("cidade", "cidade__state").all()
+class PontoTuristicoViewSet(viewsets.ReadOnlyModelViewSet):
+  queryset = PontoTuristico.objects.select_related(
+    "cidade",
+    "cidade__state",
+  ).all()
   serializer_class = PontoTuristicoSerializer
   filter_backends = [filters.SearchFilter, filters.OrderingFilter]
   search_fields = ["name"]
@@ -57,6 +64,8 @@ class PontoTuristicoViewSet(viewsets.ModelViewSet):
   def get_queryset(self):
     qs = super().get_queryset()
     cidade_slug = self.request.query_params.get("cidade")
+
     if cidade_slug:
       qs = qs.filter(cidade__slug=cidade_slug)
+
     return qs
