@@ -2,10 +2,6 @@ services:
   redis:
     container_name: redis
     image: redis:7
-#    ports:
-#      - "6379:6379"
-# nao precisamos mapear uma porta do nosso computador para o redis porque somente quem
-# vai acessar ele sao os outros servicos que estao na mesma rede
     volumes:
       - redisdata:/data
     restart: unless-stopped
@@ -24,7 +20,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5432:5432"
-# aqui nos mapeamos uma porta para podermos acessar pelo pgAdmin
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -34,85 +29,89 @@ services:
       timeout: 5s
       retries: 30
 
-  django:
-    container_name: django
-
+  migrate:
+    container_name: migrate
     build:
       context: .
       dockerfile: Dockerfile
-    
-    image: daniel/django:1.0.0
+    working_dir: /app/otsuldeminas/
+    command: uv run manage.py migrate
+    env_file: .env
+    volumes:
+      - .:/app
+      - /app/.venv
+    environment:
+      - UV_LINK_MODE=copy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  django:
+    container_name: django
+    build:
+      context: .
+      dockerfile: Dockerfile
     working_dir: /app/otsuldeminas/
     command: uv run manage.py runserver 0.0.0.0:8000
     env_file: .env
     volumes:
       - .:/app
-      - /app/.venv      # <-- ADICIONE ESTA LINHA (Isola o venv)
+      - /app/.venv
     environment:
-    - UV_LINK_MODE=copy # <-- ADICIONE ESTA LINHA (Resolve o alerta amarelo do log)
+      - UV_LINK_MODE=copy
     ports:
       - "8000:8000"
-#    environment:
-#      PYTHONDONTWRITEBYTECODE: 1 Ja esta setado no Dockerfile
-#      PYTHONUNBUFFERED: 1
-#      DEBUG: 1 Ja esta no .env que eu passei como paramentro para o env_file
     depends_on:
-      redis: { condition: service_healthy }
-      postgres: { condition: service_healthy }
-  
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   celery:
     container_name: celery
-
     build:
       context: .
       dockerfile: Dockerfile
-    
-    image: daniel/celery:1.0.0
-    
     working_dir: /app/otsuldeminas/
     command: uv run celery --app=otsuldeminas worker -l INFO -E
-
-
     env_file: .env
     volumes:
       - .:/app
-      - /app/.venv      # <-- ADICIONE ESTA LINHA (Isola o venv)
+      - /app/.venv
     environment:
-    - UV_LINK_MODE=copy # <-- ADICIONE ESTA LINHA (Resolve o alerta amarelo do log)
-#    environment:
-#      PYTHONDONTWRITEBYTECODE: 1 Ja esta setado no Dockerfile
-#      PYTHONUNBUFFERED: 1
-#      DEBUG: 1 Ja esta no .env que eu passei como paramentro para o env_file
+      - UV_LINK_MODE=copy
     depends_on:
-      redis: { condition: service_healthy }
-      postgres: { condition: service_healthy }
-  
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   beat:
     container_name: beat
-
     build:
       context: .
       dockerfile: Dockerfile
-    
-    image: daniel/beat:1.0.0
-    
     working_dir: /app/otsuldeminas/
     command: uv run celery --app=otsuldeminas beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
-
     env_file: .env
     volumes:
       - .:/app
-      - /app/.venv      # <-- ADICIONE ESTA LINHA (Isola o venv)
+      - /app/.venv
     environment:
-      - UV_LINK_MODE=copy # <-- ADICIONE ESTA LINHA (Resolve o alerta amarelo do log)
-#    environment:
-#      PYTHONDONTWRITEBYTECODE: 1 Ja esta setado no Dockerfile
-#      PYTHONUNBUFFERED: 1
-#      DEBUG: 1 Ja esta no .env que eu passei como paramentro para o env_file
+      - UV_LINK_MODE=copy
     depends_on:
-      redis: { condition: service_healthy }
-      postgres: { condition: service_healthy }    
-
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
 volumes:
   redisdata:
