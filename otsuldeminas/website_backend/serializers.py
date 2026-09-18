@@ -12,7 +12,6 @@ class ImagemSerializer(serializers.ModelSerializer):
 
 class ContatoSerializer(serializers.ModelSerializer):
   type_display = serializers.CharField(source="get_type_display", read_only=True)
-
   class Meta:
     model = Contato
     fields = [
@@ -97,12 +96,18 @@ class CidadeSerializer(GenericRelatedSerializerMixin, serializers.ModelSerialize
       "state_name",
       "ibge_code",
       "hospedagens",
-      "leitos",
       "restaurantes",
       "populacao",
+      "pib",
       "imagens",
       "contatos",
     ]
+    read_only_fields = (
+      "hospedagens",
+      "restaurantes",
+      "populacao",
+      "pib",
+    )
 
 
 class EventoSerializer(GenericRelatedSerializerMixin, serializers.ModelSerializer):

@@ -72,7 +72,7 @@ class EstadoAdmin(admin.ModelAdmin):
 class CidadeAdmin(CityScopedAdminMixin, admin.ModelAdmin):
   cidade_lookup = "pk"
 
-  list_display = ("name", "state", "populacao", "hospedagens", "leitos", "slug")
+  list_display = ("name", "state", "populacao", "hospedagens", "pib", "slug")
   list_filter = ("state",)
   search_fields = ("name", "ibge_code")
   prepopulated_fields = {"slug": ("name",)}
@@ -84,11 +84,15 @@ class CidadeAdmin(CityScopedAdminMixin, admin.ModelAdmin):
     return request.user.is_superuser
 
   def get_readonly_fields(self, request, obj=None):
-    if request.user.is_superuser:
-      return ()
-    # A city manager can update numbers/description but shouldn't be
-    # able to reparent their city to another state or change its slug.
-    return ("state", "slug", "ibge_code")
+    return (
+      "state",
+      "slug",
+      "ibge_code",
+      "hospedagens",
+      "restaurantes",
+      "populacao",
+      "pib",
+    )
 
 
 @admin.register(Evento)

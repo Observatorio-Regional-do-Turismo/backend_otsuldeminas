@@ -11,6 +11,8 @@ from caged.models import SaldoMensalCaged
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db.models import Max
+from website_backend.models import Cidade
+from .services.ibge import collect_city_indicators
 
 @shared_task(
     bind=True,
@@ -252,6 +254,24 @@ def task_teste(**kwargs):
     if "opa" in kwargs:
         return f"Teste OK! opa={kwargs['opa']}"
     return "Nenhum parâmetro recebido."
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Timeout, ConnectionError),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
+def task_coletar_indicadores_ibge(self, cidade_id: int | None = None):
+    """Collect IBGE indicators for one city or every registered city."""
+    if cidade_id is not None:
+        cidade = Cidade.objects.get(pk=cidade_id)
+        collect_city_indicators(cidade)
+        return cidade_id
+
+    for cidade in Cidade.objects.exclude(ibge_code__isnull=True).exclude(ibge_code=""):
+        collect_city_indicators(cidade)
 
 
 @shared_task(

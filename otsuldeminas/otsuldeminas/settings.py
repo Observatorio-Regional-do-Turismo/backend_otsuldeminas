@@ -1,6 +1,7 @@
 import os
 import environ
 from pathlib import Path
+from celery.schedules import crontab
 from django.templatetags.static import static
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -126,6 +127,12 @@ CELERY_RESULT_BACKEND = 'django-db'
 CELERY_TIMEZONE = "America/Sao_Paulo"
 CELERY_ENABLE_UTC = True
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULE = {
+    "collect-ibge-city-indicators-monthly": {
+        "task": "etl.tasks.task_coletar_indicadores_ibge",
+        "schedule": crontab(day_of_month=1, hour=3, minute=0),
+    },
+}
 
 
 REST_FRAMEWORK = {

@@ -140,9 +140,9 @@ class Cidade(InformacaoBasica):
   )
 
   hospedagens = models.PositiveIntegerField(default=0)
-  leitos = models.PositiveIntegerField(default=0)
   restaurantes = models.PositiveIntegerField(default=0)
   populacao = models.PositiveIntegerField(default=0)
+  pib = models.PositiveIntegerField(default=0)
 
   image_relations = GenericRelation(
     Imagem,
