@@ -6,9 +6,7 @@ from django.templatetags.static import static
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-env = environ.Env(
-    DEBUG=(bool, False)
-)
+env = environ.Env(DEBUG=(bool, False))
 
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
@@ -144,43 +142,44 @@ REST_FRAMEWORK = {
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 UNFOLD = {
-    "SITE_TITLE": "Plataforma de Engenharia de Dados OTSULDEMINAS",
-    "SITE_HEADER": "Eng. OTSULDEMINAS",
-    "SITE_URL": "/",
-    
-    "COLORS": {
-        "primary": {
-            50: "240 253 244",    # #f0fdf4
-            100: "220 252 231",   # #dcfce7
-            200: "187 247 208",   # #bbf7d0
-            300: "134 239 172",   # #86efac
-            400: "74 222 128",    # #4ade80
-            500: "0 156 59",      # #009c3b
-            600: "0 130 50",      # #008232
-            700: "0 100 40",      # #006428
-            800: "0 75 30",       # #004b1e
-            900: "0 55 22",       # #003716
-            950: "0 35 14",       # #00230e
-        },
-    },
-    
-    "SITE_ICON": {
-        "light": lambda request: static("img/logo.png"),
-        "dark": lambda request: static("img/logo.png"),
-    },
-    
-    "SITE_FAVICONS": [
-        {
-            "rel": "icon",
-            "sizes": "any",  # ou "32x32", "16x16", etc.
-            "type": "image/png",
-            "href": lambda request: static("img/logo.png"),
-        },
-    ],
-}
+  "SITE_TITLE": "Plataforma de Engenharia de Dados OTSULDEMINAS",
+  "SITE_HEADER": "Eng. OTSULDEMINAS",
+  "SITE_URL": "/",
 
-#print("CAMINHO DO BASE_DIR:", BASE_DIR)
-#print("VALOR DO ALLOWED_HOSTS:", ALLOWED_HOSTS)
+  "COLORS": {
+    "primary": {
+      50: "240 253 244",
+      100: "220 252 231",
+      200: "187 247 208",
+      300: "134 239 172",
+      400: "74 222 128",
+      500: "0 156 59",
+      600: "0 130 50",
+      700: "0 100 40",
+      800: "0 75 30",
+      900: "0 55 22",
+      950: "0 35 14",
+    },
+  },
+
+  "SITE_ICON": {
+    "light": lambda request: static("img/logo.png"),
+    "dark": lambda request: static("img/logo.png"),
+  },
+
+  "SITE_FAVICONS": [
+    {
+      "rel": "icon",
+      "sizes": "any",
+      "type": "image/png",
+      "href": lambda request: static("img/logo.png"),
+    },
+  ],
+	
+	"STYLES": [
+    lambda request: static("css/admin.css"),
+  ],
+}
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
@@ -191,7 +190,4 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER') # os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-EMAIL_NOTIFICATION_TO = env(
-    'EMAIL_NOTIFICATION_TO',
-    default=EMAIL_HOST_USER,
-)
+EMAIL_NOTIFICATION_TO = env('EMAIL_NOTIFICATION_TO', default=EMAIL_HOST_USER)

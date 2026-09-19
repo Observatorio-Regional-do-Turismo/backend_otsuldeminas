@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
 
 
+# INFORMAÇÕES BASICAS ==================================================================================================
 class InformacaoBasica(models.Model):
   name = models.CharField(max_length=255)
   slug = models.SlugField(max_length=255)
@@ -17,6 +18,7 @@ class InformacaoBasica(models.Model):
     return self.name
 
 
+# IMAGENS ==============================================================================================================
 class Imagem(models.Model):
   image = models.ImageField(upload_to="website/images/")
   alt_text = models.CharField(max_length=255, blank=True, help_text="Texto alternativo para acessibilidade e SEO.",)
@@ -38,6 +40,7 @@ class Imagem(models.Model):
     return self.image.name
 
 
+# CONTATOS =============================================================================================================
 class Contato(models.Model):
   class Tipo(models.TextChoices):
     WEBSITE = "website", "Site"
@@ -51,8 +54,8 @@ class Contato(models.Model):
     ADDRESS = "address", "Endereço"
     LOCATION = "location", "Localização"
 
-  content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
   object_id = models.PositiveBigIntegerField()
+  content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
   content_object = GenericForeignKey("content_type", "object_id")
 
   type = models.CharField(max_length=30, choices=Tipo.choices)
@@ -60,26 +63,8 @@ class Contato(models.Model):
   value = models.TextField(blank=True)
 
   address = models.CharField(max_length=500, blank=True)
-  latitude = models.DecimalField(
-    max_digits=9,
-    decimal_places=6,
-    null=True,
-    blank=True,
-    validators=[
-      MinValueValidator(-90),
-      MaxValueValidator(90),
-    ],
-  )
-  longitude = models.DecimalField(
-    max_digits=9,
-    decimal_places=6,
-    null=True,
-    blank=True,
-    validators=[
-      MinValueValidator(-180),
-      MaxValueValidator(180),
-    ],
-  )
+  latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
+  longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
 
   order = models.PositiveIntegerField(default=0)
 
@@ -93,18 +78,14 @@ class Contato(models.Model):
     return f"{self.get_type_display()}: {self.value or self.address}"
 
 
+
+# ESTADOS ==============================================================================================================
 class Estado(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
-
   abbreviation = models.CharField(max_length=2, unique=True)
-  image_relations = GenericRelation(
-    Imagem,
-    related_query_name="estado",
-  )
-  contact_relations = GenericRelation(
-    Contato,
-    related_query_name="estado",
-  )
+  
+  image_relations = GenericRelation(Imagem, related_query_name="estado")
+  contact_relations = GenericRelation(Contato, related_query_name="estado")
 
   class Meta:
     verbose_name = "Estado"
@@ -123,45 +104,28 @@ class Estado(InformacaoBasica):
     return self.contact_relations.all()
 
 
+# CIDADES ==============================================================================================================
 class Cidade(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
-
-  state = models.ForeignKey(
-    Estado,
-    on_delete=models.CASCADE,
-    related_name="cidades",
-  )
-
-  ibge_code = models.CharField(
-    max_length=7,
-    unique=True,
-    null=True,
-    blank=True,
-  )
-
+  ibge_code = models.CharField(max_length=7, unique=True, null=True, blank=True)
+  latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
+  longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
+  
   hospedagens = models.PositiveIntegerField(default=0)
   restaurantes = models.PositiveIntegerField(default=0)
   populacao = models.PositiveIntegerField(default=0)
   pib = models.PositiveIntegerField(default=0)
 
-  image_relations = GenericRelation(
-    Imagem,
-    related_query_name="cidade",
-  )
-  contact_relations = GenericRelation(
-    Contato,
-    related_query_name="cidade",
-  )
+  state = models.ForeignKey(Estado, on_delete=models.CASCADE, related_name="cidades")
+  image_relations = GenericRelation(Imagem, related_query_name="cidade")
+  contact_relations = GenericRelation(Contato, related_query_name="cidade")
 
   class Meta:
     verbose_name = "Cidade"
     verbose_name_plural = "Cidades"
     ordering = ["name"]
     constraints = [
-      models.UniqueConstraint(
-        fields=["state", "slug"],
-        name="unique_cidade_slug_por_estado",
-      ),
+      models.UniqueConstraint(fields=["state", "slug"], name="unique_cidade_slug_por_estado",),
     ]
 
   def __str__(self):
@@ -176,43 +140,23 @@ class Cidade(InformacaoBasica):
     return self.contact_relations.all()
 
 
+# EVENTOS ==============================================================================================================
 class Evento(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
-
-  cidade = models.ForeignKey(
-    Cidade,
-    on_delete=models.CASCADE,
-    related_name="eventos",
-  )
-
   start_date = models.DateTimeField()
   end_date = models.DateTimeField(null=True, blank=True)
 
-  image_relations = GenericRelation(
-    Imagem,
-    related_query_name="evento",
-  )
-  contact_relations = GenericRelation(
-    Contato,
-    related_query_name="evento",
-  )
+  cidade = models.ForeignKey(Cidade, on_delete=models.CASCADE, related_name="eventos",)
+  image_relations = GenericRelation(Imagem, related_query_name="evento")
+  contact_relations = GenericRelation(Contato, related_query_name="evento")
 
   class Meta:
     verbose_name = "Evento"
     verbose_name_plural = "Eventos"
     ordering = ["start_date"]
     constraints = [
-      models.UniqueConstraint(
-        fields=["cidade", "slug"],
-        name="unique_evento_slug_por_cidade",
-      ),
-      models.CheckConstraint(
-        condition=(
-                models.Q(end_date__isnull=True)
-                | models.Q(end_date__gte=models.F("start_date"))
-        ),
-        name="evento_end_date_maior_ou_igual_start_date",
-      ),
+      models.UniqueConstraint(fields=["cidade", "slug"], name="unique_evento_slug_por_cidade"),
+      models.CheckConstraint(condition=(models.Q(end_date__isnull=True) | models.Q(end_date__gte=models.F("start_date"))), name="evento_end_date_maior_ou_igual_start_date"),
     ]
 
   def __str__(self):
@@ -227,33 +171,20 @@ class Evento(InformacaoBasica):
     return self.contact_relations.all()
 
 
+# PONTOS TURÍSTICOS ====================================================================================================
 class PontoTuristico(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
-
-  cidade = models.ForeignKey(
-    Cidade,
-    on_delete=models.CASCADE,
-    related_name="pontos_turisticos",
-  )
-
-  image_relations = GenericRelation(
-    Imagem,
-    related_query_name="ponto_turistico",
-  )
-  contact_relations = GenericRelation(
-    Contato,
-    related_query_name="ponto_turistico",
-  )
-
+  
+  cidade = models.ForeignKey(Cidade, on_delete=models.CASCADE, related_name="pontos_turisticos")
+  image_relations = GenericRelation(Imagem, related_query_name="ponto_turistico")
+  contact_relations = GenericRelation(Contato, related_query_name="ponto_turistico")
+  
   class Meta:
     verbose_name = "Ponto Turístico"
     verbose_name_plural = "Pontos Turísticos"
     ordering = ["name"]
     constraints = [
-      models.UniqueConstraint(
-        fields=["cidade", "slug"],
-        name="unique_ponto_slug_por_cidade",
-      ),
+      models.UniqueConstraint(fields=["cidade", "slug"], name="unique_ponto_slug_por_cidade",),
     ]
 
   def __str__(self):
@@ -268,17 +199,11 @@ class PontoTuristico(InformacaoBasica):
     return self.contact_relations.all()
 
 
+# GESTORES =============================================================================================================
 class GestorCidade(models.Model):
-  user = models.OneToOneField(
-    settings.AUTH_USER_MODEL,
-    on_delete=models.CASCADE,
-    related_name="gestor_cidade",
-  )
-  cidade = models.ForeignKey(
-    "Cidade",
-    on_delete=models.CASCADE,
-    related_name="gestores",
-  )
+  user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gestor_cidade")
+  
+  cidade = models.ForeignKey("Cidade", on_delete=models.CASCADE, related_name="gestores")
 
   class Meta:
     verbose_name = "Gestor de Cidade"
