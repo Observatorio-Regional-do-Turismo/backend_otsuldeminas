@@ -111,10 +111,10 @@ class Cidade(InformacaoBasica):
   latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
   longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
   
-  hospedagens = models.PositiveIntegerField(default=0)
-  restaurantes = models.PositiveIntegerField(default=0)
-  populacao = models.PositiveIntegerField(default=0)
-  pib = models.PositiveIntegerField(default=0)
+  hospedagens = models.PositiveIntegerField(null=True)
+  restaurantes = models.PositiveIntegerField(null=True)
+  populacao = models.PositiveIntegerField(null=True)
+  pib = models.PositiveIntegerField(null=True)
 
   state = models.ForeignKey(Estado, on_delete=models.CASCADE, related_name="cidades")
   image_relations = GenericRelation(Imagem, related_query_name="cidade")
