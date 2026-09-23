@@ -78,7 +78,6 @@ class Contato(models.Model):
     return f"{self.get_type_display()}: {self.value or self.address}"
 
 
-
 # ESTADOS ==============================================================================================================
 class Estado(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
@@ -104,19 +103,40 @@ class Estado(InformacaoBasica):
     return self.contact_relations.all()
 
 
+# IGRs ==============================================================================================================
+class IGR(InformacaoBasica):
+  id = models.BigAutoField(primary_key=True)
+  
+  image_relations = GenericRelation(Imagem, related_query_name="estado")
+  contact_relations = GenericRelation(Contato, related_query_name="estado")
+  
+  class Meta:
+    verbose_name = "IGR"
+    verbose_name_plural = "IGRs"
+    ordering = ["name"]
+
+  def __str__(self):
+    return self.name
+  
+  @property
+  def imagens(self):
+    return self.image_relations.all()
+  
+  @property
+  def contatos(self):
+    return self.contact_relations.all()
+
+
 # CIDADES ==============================================================================================================
 class Cidade(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
+
   ibge_code = models.CharField(max_length=7, unique=True, null=True, blank=True)
   latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
   longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
-  
-  hospedagens = models.PositiveIntegerField(null=True)
-  restaurantes = models.PositiveIntegerField(null=True)
-  populacao = models.PositiveIntegerField(null=True)
-  pib = models.PositiveIntegerField(null=True)
 
   state = models.ForeignKey(Estado, on_delete=models.CASCADE, related_name="cidades")
+  igr = models.ForeignKey(IGR, on_delete=models.SET_NULL, null=True, related_name="cidades")
   image_relations = GenericRelation(Imagem, related_query_name="cidade")
   contact_relations = GenericRelation(Contato, related_query_name="cidade")
 
@@ -138,6 +158,34 @@ class Cidade(InformacaoBasica):
   @property
   def contatos(self):
     return self.contact_relations.all()
+
+
+class CidadeData(models.Model):
+  id = models.BigAutoField(primary_key=True)
+  
+  populacao = models.PositiveIntegerField(null=True)
+  pib = models.PositiveIntegerField(null=True)
+  pib_per_capta = models.PositiveIntegerField(null=True)
+  idh = models.FloatField(null=True)
+  idhm = models.FloatField(null=True)
+  hospedagens = models.PositiveIntegerField(null=True)
+  leitos = models.PositiveIntegerField(null=True)
+  restaurantes = models.PositiveIntegerField(null=True)
+  munic = models.PositiveIntegerField(null=True)
+  indicador_cultural_munic = models.PositiveIntegerField(null=True)
+  munic_cultura = models.PositiveIntegerField(null=True)
+  pnad = models.PositiveIntegerField(null=True)
+  estatistica_pnad = models.PositiveIntegerField(null=True)
+  pnad_rendimento = models.PositiveIntegerField(null=True)
+  pnad_ocupacao = models.PositiveIntegerField(null=True)
+  area_territorial = models.FloatField(null=True)
+  area = models.FloatField(null=True)
+  densidade_demografica = models.FloatField(null=True)
+  densidade = models.FloatField(null=True)
+  escolarizacao = models.FloatField(null=True)
+  taxa_escolarizacao = models.FloatField(null=True)
+
+  cidade = models.OneToOneField(Cidade, on_delete=models.CASCADE, related_name="information")
 
 
 # EVENTOS ==============================================================================================================

@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
-
-from .models import Cidade, Contato, Estado, Evento, GestorCidade, Imagem, PontoTuristico
+from .models import Cidade, Contato, Estado, Evento, GestorCidade, Imagem, PontoTuristico, IGR, CidadeData
 
 
 # IMAGENS ==============================================================================================================
@@ -28,6 +27,15 @@ class EstadoAdmin(admin.ModelAdmin):
   prepopulated_fields = {"slug": ("name",)}
   inlines = [ImagemInline, ContatoInline]
 
+
+# IGRs ==============================================================================================================
+@admin.register(IGR)
+class IGRAdmin(admin.ModelAdmin):
+  list_display = ("name", "slug")
+  search_fields = ("name",)
+  prepopulated_fields = {"slug": ("name",)}
+  inlines = [ImagemInline, ContatoInline]
+  
 
 # CIDADES ==============================================================================================================
 class CityScopedAdminMixin:
@@ -69,24 +77,35 @@ class CityScopedAdminMixin:
       return super().has_delete_permission(request, obj)
     return super().has_delete_permission(request, obj) and self._obj_matches_managed_cidade(request, obj)
 
+class CidadeDataInline(admin.TabularInline):
+  model = CidadeData
+  extra = 0
+  fields = tuple(
+    field.name
+    for field in CidadeData._meta.fields
+    if field.name not in {"id", "cidade"}
+  )
+
+  def get_readonly_fields(self, request, obj=None):
+    return list(self.fields)
 
 @admin.register(Cidade)
 class CidadeAdmin(CityScopedAdminMixin, admin.ModelAdmin):
   cidade_lookup = "pk"
 
-  list_display = ("name", "state", "populacao", "hospedagens", "pib", "slug")
+  list_display = ("name", "state", "slug")
   list_filter = ("state",)
   search_fields = ("name", "ibge_code")
   prepopulated_fields = {"slug": ("name",)}
   autocomplete_fields = ("state",)
-  inlines = [ImagemInline, ContatoInline]
+  inlines = [ImagemInline, ContatoInline, CidadeDataInline]
 
   def has_add_permission(self, request):
     return request.user.is_superuser
-  
-  def get_readonly_fields(self, request, obj=None):
-    readonly = [ "hospedagens", "restaurantes", "populacao", "pib", ]
-    return readonly
+  #
+  # def get_readonly_fields(self, request, obj=None):
+  #   readonly = [ "hospedagens", "restaurantes", "populacao", "pib", ]
+  #   return readonly
 
 
 # EVENTOS ==============================================================================================================

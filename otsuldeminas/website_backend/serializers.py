@@ -95,10 +95,6 @@ class CidadeSerializer(GenericRelatedSerializerMixin, serializers.ModelSerialize
       "state",
       "state_name",
       "ibge_code",
-      "hospedagens",
-      "restaurantes",
-      "populacao",
-      "pib",
       "imagens",
       "contatos",
     ]

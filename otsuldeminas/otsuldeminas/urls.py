@@ -2,18 +2,19 @@ from django.contrib import admin
 from django.conf import settings
 from django.urls import path, include
 from django.conf.urls.static import static
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
-# Configurar títulos do admin
-#admin.site.site_header = "Otsulde Minas"
-#admin.site.site_title = "Otsulde Minas - Admin"
 admin.site.index_title = ""
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
     path('api/', include('api.urls')),
+    
     path('backend/', include('website_backend.urls')),
-    path('schema/', include('schema_viewer.urls')),
+    path('schema/', SpectacularAPIView.as_view(), name='backend-schema'),
+    path('docs/', SpectacularSwaggerView.as_view(url_name='backend-schema'), name='backend-swagger-ui'),
+    path('redoc/', SpectacularRedocView.as_view(url_name='backend-schema'), name='backend-redoc'),
 ]
 
 if settings.DEBUG:
