@@ -22,7 +22,8 @@ class IGRFilter(django_filters.FilterSet):
 class CidadeFilter(django_filters.FilterSet):
   name = django_filters.CharFilter(lookup_expr="icontains")
   ibge_code = django_filters.CharFilter(lookup_expr="exact")
-  estado = django_filters.CharFilter(field_name="state__slug", lookup_expr="exact")
+  estado = django_filters.CharFilter(field_name="state__id", lookup_expr="exact")
+  igr = django_filters.CharFilter(field_name="igr__id", lookup_expr="exact")
 
   class Meta:
     model = Cidade
@@ -31,8 +32,9 @@ class CidadeFilter(django_filters.FilterSet):
 
 class EventoFilter(django_filters.FilterSet):
   name = django_filters.CharFilter(lookup_expr="icontains")
-  cidade = django_filters.CharFilter(field_name="cidade__slug", lookup_expr="exact")
-  estado = django_filters.CharFilter(field_name="cidade__state__slug", lookup_expr="exact")
+  cidade = django_filters.CharFilter(field_name="cidade__id", lookup_expr="exact")
+  estado = django_filters.CharFilter(field_name="cidade__state__id", lookup_expr="exact")
+  igr = django_filters.CharFilter(field_name="cidade__igr__id", lookup_expr="exact")
   ibge_code = django_filters.CharFilter(field_name="cidade__ibge_code", lookup_expr="exact")
   start_date = django_filters.IsoDateTimeFilter(lookup_expr="exact")
   end_date = django_filters.IsoDateTimeFilter(lookup_expr="exact")
@@ -44,8 +46,9 @@ class EventoFilter(django_filters.FilterSet):
 
 class PontoTuristicoFilter(django_filters.FilterSet):
   name = django_filters.CharFilter(lookup_expr="icontains")
-  cidade = django_filters.CharFilter(field_name="cidade__slug", lookup_expr="exact")
-  estado = django_filters.CharFilter(field_name="cidade__state__slug", lookup_expr="exact")
+  cidade = django_filters.CharFilter(field_name="cidade__id", lookup_expr="exact")
+  estado = django_filters.CharFilter(field_name="cidade__state__id", lookup_expr="exact")
+  igr = django_filters.CharFilter(field_name="cidade__igr__id", lookup_expr="exact")
   ibge_code = django_filters.CharFilter(field_name="cidade__ibge_code", lookup_expr="exact")
 
   class Meta:

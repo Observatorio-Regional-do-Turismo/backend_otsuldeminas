@@ -29,13 +29,13 @@ services:
       timeout: 5s
       retries: 30
 
-  migrate:
+  makemigrations:
     container_name: migrate
     build:
       context: .
       dockerfile: Dockerfile
     working_dir: /app/otsuldeminas/
-    command: uv run manage.py makemigrations; uv run manage.py migrate
+    command: uv run manage.py makemigrations;
     env_file: .env
     volumes:
       - .:/app
@@ -47,6 +47,27 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  migrate:
+    container_name: migrate
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/otsuldeminas/
+    command: uv run manage.py migrate
+    env_file: .env
+    volumes:
+      - .:/app
+      - /app/.venv
+    environment:
+      - UV_LINK_MODE=copy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      makemigrations:
+        condition: service_completed_successfully
 
   django:
     container_name: django

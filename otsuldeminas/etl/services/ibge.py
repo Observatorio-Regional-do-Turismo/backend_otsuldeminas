@@ -17,9 +17,7 @@ INDICATORS = {
 
 
 def _build_url(indicator: dict[str, Any], ibge_code: str) -> str:
-	url = (
-		f"{IBGE_API_URL}/{indicator['aggregate']}/periodos/-1/variaveis/{indicator['variable']}"
-	)
+	url = f"{IBGE_API_URL}/{indicator['aggregate']}/periodos/-1/variaveis/{indicator['variable']}"
 	params = {"localidades": f"N6[{ibge_code}]"}
 	if "classificacao" in indicator:
 		params["classificacao"] = indicator["classificacao"]
@@ -39,7 +37,7 @@ def extract_positive_integer(payload: Any) -> int:
 def collect_city_indicators(cidade: Cidade, *, request_get: Callable[..., requests.Response] = requests.get, value_extractor: Callable[[Any], int] = extract_positive_integer,) -> None:
 	if not cidade.ibge_code:
 		return
-	
+
 	values = {}
 	for field_name, indicator in INDICATORS.items():
 		try:
