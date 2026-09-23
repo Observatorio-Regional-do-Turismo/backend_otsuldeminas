@@ -35,7 +35,7 @@ services:
       context: .
       dockerfile: Dockerfile
     working_dir: /app/otsuldeminas/
-    command: uv run manage.py migrate
+    command: uv run manage.py makemigrations; uv run manage.py migrate
     env_file: .env
     volumes:
       - .:/app

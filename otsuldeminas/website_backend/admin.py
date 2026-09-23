@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from .models import Cidade, Contato, Estado, Evento, GestorCidade, Imagem, PontoTuristico, IGR, CidadeData
 
@@ -21,7 +22,7 @@ class ContatoInline(GenericTabularInline):
 
 # ESTADOS ==============================================================================================================
 @admin.register(Estado)
-class EstadoAdmin(admin.ModelAdmin):
+class EstadoAdmin(ModelAdmin):
   list_display = ("name", "abbreviation", "slug")
   search_fields = ("name", "abbreviation")
   prepopulated_fields = {"slug": ("name",)}
@@ -30,7 +31,7 @@ class EstadoAdmin(admin.ModelAdmin):
 
 # IGRs ==============================================================================================================
 @admin.register(IGR)
-class IGRAdmin(admin.ModelAdmin):
+class IGRAdmin(ModelAdmin):
   list_display = ("name", "slug")
   search_fields = ("name",)
   prepopulated_fields = {"slug": ("name",)}
@@ -90,7 +91,7 @@ class CidadeDataInline(admin.TabularInline):
     return list(self.fields)
 
 @admin.register(Cidade)
-class CidadeAdmin(CityScopedAdminMixin, admin.ModelAdmin):
+class CidadeAdmin(CityScopedAdminMixin, ModelAdmin):
   cidade_lookup = "pk"
 
   list_display = ("name", "state", "slug")
@@ -110,7 +111,7 @@ class CidadeAdmin(CityScopedAdminMixin, admin.ModelAdmin):
 
 # EVENTOS ==============================================================================================================
 @admin.register(Evento)
-class EventoAdmin(CityScopedAdminMixin, admin.ModelAdmin):
+class EventoAdmin(CityScopedAdminMixin, ModelAdmin):
   cidade_lookup = "cidade"
 
   list_display = ("name", "cidade", "start_date", "end_date")
@@ -145,7 +146,7 @@ class EventoAdmin(CityScopedAdminMixin, admin.ModelAdmin):
 
 # PONTOS TURÍSTICOS ====================================================================================================
 @admin.register(PontoTuristico)
-class PontoTuristicoAdmin(CityScopedAdminMixin, admin.ModelAdmin):
+class PontoTuristicoAdmin(CityScopedAdminMixin, ModelAdmin):
   cidade_lookup = "cidade"
 
   list_display = ("name", "cidade", "slug")
@@ -178,7 +179,7 @@ class PontoTuristicoAdmin(CityScopedAdminMixin, admin.ModelAdmin):
 
 # GESTORES =============================================================================================================
 @admin.register(GestorCidade)
-class GestorCidadeAdmin(admin.ModelAdmin):
+class GestorCidadeAdmin(ModelAdmin):
   # Superuser-only: this is how you assign a manager to a city.
   list_display = ("user", "cidade")
   autocomplete_fields = ("user", "cidade")

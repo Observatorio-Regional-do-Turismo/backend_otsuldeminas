@@ -21,8 +21,8 @@ class InformacaoBasica(models.Model):
 # IMAGENS ==============================================================================================================
 class Imagem(models.Model):
   image = models.ImageField(upload_to="website/images/")
-  alt_text = models.CharField(max_length=255, blank=True, help_text="Texto alternativo para acessibilidade e SEO.",)
-  caption = models.CharField(max_length=255, blank=True)
+  alt_text = models.CharField(max_length=255, null=True, blank=True, help_text="Texto alternativo para acessibilidade e SEO.",)
+  caption = models.CharField(max_length=255, null=True, blank=True)
   order = models.PositiveIntegerField(default=0)
   is_cover = models.BooleanField(default=False)
 
@@ -32,9 +32,7 @@ class Imagem(models.Model):
 
   class Meta:
     ordering = ["order", "id"]
-    indexes = [
-      models.Index(fields=["content_type", "object_id"]),
-    ]
+    indexes = [models.Index(fields=["content_type", "object_id"])]
 
   def __str__(self):
     return self.image.name
@@ -51,7 +49,6 @@ class Contato(models.Model):
     FACEBOOK = "facebook", "Facebook"
     YOUTUBE = "youtube", "YouTube"
     TIKTOK = "tiktok", "TikTok"
-    ADDRESS = "address", "Endereço"
     LOCATION = "location", "Localização"
 
   object_id = models.PositiveBigIntegerField()
@@ -59,20 +56,16 @@ class Contato(models.Model):
   content_object = GenericForeignKey("content_type", "object_id")
 
   type = models.CharField(max_length=30, choices=Tipo.choices)
-  label = models.CharField(max_length=255, blank=True)
-  value = models.TextField(blank=True)
+  label = models.CharField(max_length=255)
+  value = models.TextField(max_length=500)
+  order = models.PositiveIntegerField(default=0)
 
-  address = models.CharField(max_length=500, blank=True)
   latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
   longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
 
-  order = models.PositiveIntegerField(default=0)
-
   class Meta:
     ordering = ["order", "id"]
-    indexes = [
-      models.Index(fields=["content_type", "object_id"]),
-    ]
+    indexes = [models.Index(fields=["content_type", "object_id"])]
 
   def __str__(self):
     return f"{self.get_type_display()}: {self.value or self.address}"
@@ -136,7 +129,7 @@ class Cidade(InformacaoBasica):
   longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
 
   state = models.ForeignKey(Estado, on_delete=models.CASCADE, related_name="cidades")
-  igr = models.ForeignKey(IGR, on_delete=models.SET_NULL, null=True, related_name="cidades")
+  igr = models.ForeignKey(IGR, on_delete=models.SET_NULL, null=True, blank=True, related_name="cidades")
   image_relations = GenericRelation(Imagem, related_query_name="cidade")
   contact_relations = GenericRelation(Contato, related_query_name="cidade")
 
@@ -247,11 +240,11 @@ class PontoTuristico(InformacaoBasica):
     return self.contact_relations.all()
 
 
-# GESTORES =============================================================================================================
+# GESTOR CIDADE =============================================================================================================
 class GestorCidade(models.Model):
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gestor_cidade")
   
-  cidade = models.ForeignKey("Cidade", on_delete=models.CASCADE, related_name="gestores")
+  cidade = models.ForeignKey(Cidade, on_delete=models.CASCADE, related_name="gestores")
 
   class Meta:
     verbose_name = "Gestor de Cidade"
@@ -259,3 +252,17 @@ class GestorCidade(models.Model):
 
   def __str__(self):
     return f"{self.user} → {self.cidade}"
+
+
+# GESTOR IGR =============================================================================================================
+class GestorIGR(models.Model):
+	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gestor_igr")
+	
+	igr = models.ForeignKey(IGR, on_delete=models.CASCADE, related_name="gestores")
+	
+	class Meta:
+		verbose_name = "Gestor de IGR"
+		verbose_name_plural = "Gestores de IGR"
+	
+	def __str__(self):
+		return f"{self.user} → {self.igr}"

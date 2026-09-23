@@ -1,5 +1,4 @@
 from rest_framework.routers import DefaultRouter
-
 from .views import CidadeViewSet, EstadoViewSet, EventoViewSet, PontoTuristicoViewSet
 
 router = DefaultRouter()

@@ -10,11 +10,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
     path('api/', include('api.urls')),
-    
     path('backend/', include('website_backend.urls')),
+		
+		# SWAGGER
     path('schema/', SpectacularAPIView.as_view(), name='backend-schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='backend-schema'), name='backend-swagger-ui'),
-    path('redoc/', SpectacularRedocView.as_view(url_name='backend-schema'), name='backend-redoc'),
 ]
 
 if settings.DEBUG:

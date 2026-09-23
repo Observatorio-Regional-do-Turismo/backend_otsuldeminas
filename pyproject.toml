@@ -43,4 +43,5 @@ dependencies = [
     "django-environ>=0.14.0",
     "pillow>=12.3.0",
     "django-cors-headers>=4.9.0",
+    "django-rest-swagger>=2.2.0",
 ]

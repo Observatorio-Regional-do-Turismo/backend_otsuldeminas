@@ -1,71 +1,55 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
-
-from .models import Cidade, Estado, Evento, PontoTuristico
-from .serializers import (
-  CidadeSerializer,
-  EstadoSerializer,
-  EventoSerializer,
-  PontoTuristicoSerializer,
-)
+from .models import Cidade, Estado, Evento, PontoTuristico, IGR
+from .serializers import CidadeDetailSerializer, CidadeSerializer, EstadoSerializer, EventoSerializer, PontoTuristicoSerializer, IGRSerializer
+from .filters import CidadeFilter, EstadoFilter, EventoFilter, IGRFilter, PontoTuristicoFilter
 
 
+# ESTADOS ==============================================================================================================
 class EstadoViewSet(viewsets.ReadOnlyModelViewSet):
   queryset = Estado.objects.all()
   serializer_class = EstadoSerializer
-  filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-  search_fields = ["name", "abbreviation"]
+  filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+  filterset_class = EstadoFilter
   ordering_fields = ["name"]
 
 
+# IGRs ==============================================================================================================
+class IGRViewSet(viewsets.ReadOnlyModelViewSet):
+  queryset = IGR.objects.all()
+  serializer_class = IGRSerializer
+  filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+  filterset_class = IGRFilter
+  ordering_fields = ["name"]
+
+
+# CIDADES ==============================================================================================================
 class CidadeViewSet(viewsets.ReadOnlyModelViewSet):
   queryset = Cidade.objects.select_related("state").all()
   serializer_class = CidadeSerializer
-  filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-  search_fields = ["name", "ibge_code"]
-  ordering_fields = ["name", "populacao", "hospedagens", "leitos"]
+  filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+  filterset_class = CidadeFilter
+  ordering_fields = ["name"]
 
-  def get_queryset(self):
-    qs = super().get_queryset()
-    estado_slug = self.request.query_params.get("estado")
-
-    if estado_slug:
-      qs = qs.filter(state__slug=estado_slug)
-
-    return qs
+  def get_serializer_class(self):
+    if self.action == "retrieve":
+      return CidadeDetailSerializer
+    return CidadeSerializer
 
 
+# EVENTOS ==============================================================================================================
 class EventoViewSet(viewsets.ReadOnlyModelViewSet):
   queryset = Evento.objects.select_related("cidade", "cidade__state").all()
   serializer_class = EventoSerializer
-  filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-  search_fields = ["name"]
-  ordering_fields = ["start_date", "end_date"]
-
-  def get_queryset(self):
-    qs = super().get_queryset()
-    cidade_slug = self.request.query_params.get("cidade")
-
-    if cidade_slug:
-      qs = qs.filter(cidade__slug=cidade_slug)
-
-    return qs
+  filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+  filterset_class = EventoFilter
+  ordering_fields = ["cidade", "start_date", "name"]
 
 
+# PONTOS TURÍSTICOS ====================================================================================================
 class PontoTuristicoViewSet(viewsets.ReadOnlyModelViewSet):
-  queryset = PontoTuristico.objects.select_related(
-    "cidade",
-    "cidade__state",
-  ).all()
+  queryset = PontoTuristico.objects.select_related("cidade", "cidade__state",).all()
   serializer_class = PontoTuristicoSerializer
-  filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-  search_fields = ["name"]
-  ordering_fields = ["name"]
-
-  def get_queryset(self):
-    qs = super().get_queryset()
-    cidade_slug = self.request.query_params.get("cidade")
-
-    if cidade_slug:
-      qs = qs.filter(cidade__slug=cidade_slug)
-
-    return qs
+  filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+  filterset_class = PontoTuristicoFilter
+  ordering_fields = ["cidade", "name"]
