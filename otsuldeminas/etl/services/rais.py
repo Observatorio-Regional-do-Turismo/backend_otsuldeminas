@@ -350,15 +350,6 @@ def carregar_estab_pub(arquivoColetado: ArquivoColetado, codigo_ibge=None):
 # Este nome aqui esta ruim. A função não carrega os saldos mensais, ela atualiza os estoques mensais com base nos saldos mensais e nos estoques anuais. Talvez seja melhor renomear para "atualizar_estoques_mensais_com_saldos" ou algo do tipo.
 #seria bom declarar a variavel qtd antes do if, para evitar problemas de escopo e melhorar a legibilidade do código.
 def carregar_saldos_mensais(year: int, codigo_ibge=None):
-    """
-    Atualiza EstoqueMensal a partir de EstoqueAnual (ano anterior) + SaldoMensal (ano atual).
-
-    Fluxo normal (codigo_ibge=None): EstoqueMensal já existe (pipeline anual
-    padrão) -> get + save, igual ao comportamento original.
-
-    Fluxo cidade nova (codigo_ibge informado): EstoqueMensal do ano/mês pode
-    ainda não existir para esse município -> update_or_create.
-    """
     codigos_ibge = _normalizar_ibge(codigo_ibge)
 
     ano_anterior = year - 1
@@ -369,15 +360,41 @@ def carregar_saldos_mensais(year: int, codigo_ibge=None):
         estoques_anuais = estoques_anuais.filter(municipio_id__in=codigos_ibge)
         saldos_mensais = saldos_mensais.filter(municipio_id__in=codigos_ibge)
 
-    #Sugestão (não ativada): avisar quando não há base para nivelar.
     if not estoques_anuais.exists():
-        raise  RuntimeError(f"Sem EstoqueAnual em {ano_anterior} para os municípios informados; nada a nivelar em {year}.")
+        if codigos_ibge is None:
+            raise RuntimeError(
+                f"Nenhum EstoqueAnual encontrado para {ano_anterior}; "
+                f"impossível montar os estoques mensais de {year}."
+            )
 
-    qtd = None
+        # Primeiro ano da série para o(s) município(s) informado(s): não há
+        # base para jan-nov, mas dezembro = próprio EstoqueAnual do ano atual.
+        estoques_do_ano = EstoqueAnual.objects.filter(
+            referencia__year=year,
+            municipio_id__in=codigos_ibge,
+        )
+
+        if not estoques_do_ano.exists():
+            raise RuntimeError(
+                f"Nenhum EstoqueAnual encontrado para {year} nem para {ano_anterior} "
+                f"para os municípios {codigos_ibge}; impossível montar os estoques mensais."
+            )
+
+        data_dezembro = gerar_ultimo_dia(year, 12)
+        for estoque in estoques_do_ano:
+            EstoqueMensal.objects.update_or_create(
+                municipio=estoque.municipio,
+                cnae=estoque.cnae,
+                referencia=data_dezembro,
+                defaults={"estoque": estoque.estoque},
+            )
+        return
+
+    #qtd = None
     for estoque in estoques_anuais:
         for mes in range(1, 13):
-            
             data = gerar_ultimo_dia(year, mes)
+
             if mes == 1:
                 saldo = saldos_mensais.get(municipio=estoque.municipio, cnae=estoque.cnae, referencia=data)
                 qtd = estoque.estoque + saldo.saldo
