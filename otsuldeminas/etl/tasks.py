@@ -610,6 +610,7 @@ def task_baixar_caged(
     ano: int,
     mes: int,
     nome_arquivo_servidor : str,
+    codigo_ibge=None,
     ):
            
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
@@ -620,7 +621,7 @@ def task_baixar_caged(
     arquivo_coletado.status = "PENDING"
     arquivo_coletado.save()
     try:
-        baixar_caged(arquivoColetado=arquivo_coletado)
+        baixar_caged(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge)
         
     except Exception as e:
         arquivo_coletado.status = "FAILED"
@@ -630,7 +631,436 @@ def task_baixar_caged(
     
     return arquivo_coletado.id
 
-# @shared_task(
+
+    
+@shared_task(
+    bind=True,
+)
+def task_coletar_caged_mov(
+    self,
+    ano: int,
+    mes: int,
+    codigo_ibge=None,
+):
+    
+    arquivo_nome = "CAGEDMOV"
+    data_referencia = f"{ano:04d}-{mes:02d}"
+    arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
+            nome=arquivo_nome,
+            ano=ano,
+            mes=mes,
+        )
+    
+    arquivo_coletado.status = "PENDING"
+    arquivo_coletado.save()
+    
+    try:
+        baixar_caged(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge)    
+        
+        registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=True,
+            )
+        
+    except Exception as e:
+        arquivo_coletado.status = "FAILED"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        
+        registrar_log(
+            operacao="DOWNLOAD",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        
+        raise
+       
+    # id_arquivo_coletado = task_baixar_caged.apply(
+    #                         kwargs={
+    #                             'ano':ano,
+    #                             'mes':mes,
+    #                             'nome_arquivo_servidor':f"CAGEDMOV",
+    #                         }
+    #                     ).result
+    
+    # arquivo = ArquivoColetado.objects.get(id = id_arquivo_coletado)
+    
+    try:
+        filtrar_caged(arquivo_coletado, codigo_ibge=codigo_ibge)
+        
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+        
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+ 
+    try:
+        carregar_caged_mov(arquivo_coletado, codigo_ibge=codigo_ibge)
+        
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+        
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+    
+
+@shared_task(
+    bind=True,
+)
+def task_coletar_caged_for(
+    self,
+    ano: int,
+    mes: int,
+    codigo_ibge=None,
+):
+    arquivo_nome = "CAGEDFOR"
+    data_referencia = f"{ano:04d}-{mes:02d}"
+    arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
+            nome=arquivo_nome,
+            ano=ano,
+            mes=mes,
+        )
+    
+    arquivo_coletado.status = "PENDING"
+    arquivo_coletado.save()
+    
+    try:
+        baixar_caged(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge)
+        
+        registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=True,
+            )
+            
+    except Exception as e:
+        
+        if(str(e).startswith("550")): # arquivo não encontrado
+            print(f"Arquivo CAGED FOR {ano}-{mes} não encontrado. Pulando etapa de coleta.")
+            
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=f"{e} + Arquivo não encontrado. Pulando etapa de coleta.",
+            )
+            return None
+        else:
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=str(e),
+            )
+            raise e        
+    
+    try:
+        filtrar_caged(arquivo_coletado, codigo_ibge=codigo_ibge)
+        
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+    
+    try:
+        carregar_caged_for(arquivo_coletado, codigo_ibge=codigo_ibge)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise
+
+
+@shared_task(
+    bind=True,
+)
+def task_coletar_caged_exc(
+    self,
+    ano: int,
+    mes: int,
+    codigo_ibge=None,
+):
+    arquivo_nome = "CAGEDEXC"
+    data_referencia = f"{ano:04d}-{mes:02d}"
+    arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
+            nome=arquivo_nome,
+            ano=ano,
+            mes=mes,
+        )
+    
+    arquivo_coletado.status = "PENDING"
+    arquivo_coletado.save()
+    
+    try:
+        baixar_caged(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge)
+        registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=True,
+            )
+    except Exception as e:
+        if(str(e).startswith("550")): # arquivo não encontrado
+            print(f"Arquivo CAGED EXC {ano}-{mes} não encontrado. Pulando etapa de coleta.")
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=f"{e} + Arquivo não encontrado. Pulando etapa de coleta.",
+            )
+            return None
+        else:
+            registrar_log(
+                operacao="DOWNLOAD",
+                arquivo=arquivo_nome,
+                data_referencia=data_referencia,
+                sucesso=False,
+                erro=str(e),
+            )
+            raise e
+    
+    try:
+        filtrar_caged(arquivo_coletado, codigo_ibge=codigo_ibge)
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="FILTRO",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise   
+
+    try:
+        carregar_caged_exc(arquivo_coletado, codigo_ibge=codigo_ibge)
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        arquivo_coletado.status = "ERROR"
+        arquivo_coletado.msg = str(e)
+        arquivo_coletado.save()
+        registrar_log(
+            operacao="CARGA",
+            arquivo=arquivo_nome,
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise   
+ 
+    
+@shared_task(
+    bind=True,
+)
+def task_carregar_saldos_mensais_temporarios(
+    self,
+    year:int,
+    month:int,
+    codigo_ibge=None,
+):
+    data_referencia = f"{year:04d}-{month:02d}"
+    try:
+        carregar_saldos_mensais_temporarios(year, month, codigo_ibge=codigo_ibge)
+        registrar_log(
+            operacao="CARGA_SALDOS_MENS_TEMP",
+            arquivo="",
+            data_referencia=data_referencia,
+            sucesso=True,
+        )
+    except Exception as e:
+        print(e)
+        registrar_log(
+            operacao="CARGA_SALDOS_MENS_TEMP",
+            arquivo="",
+            data_referencia=data_referencia,
+            sucesso=False,
+            erro=str(e),
+        )
+        raise 
+
+
+@shared_task(
+    bind=True,
+)
+def task_finalizar_coleta_caged(
+        self,
+        ano: int,
+        mes: int,
+    ):
+    registrar_log(
+        operacao="FINALIZACAO",
+        arquivo="CAGED",
+        data_referencia=f"{ano:04d}-{mes:02d}",
+        sucesso=True,
+    )
+    print("Coleta dos arquivos CAGED finalizada.")
+
+
+@shared_task(bind=True)
+def task_coletar_arquivos_caged(self, **kwargs):
+    codigo_ibge = kwargs.get("codigo_ibge")
+    # =========================
+    # MODO MANUAL: ano/mes explícitos
+    # =========================
+    if "ano" in kwargs and "mes" in kwargs:
+        ano = kwargs["ano"]
+        mes = kwargs["mes"]
+
+        ch = chain(
+            task_coletar_caged_mov.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+            task_coletar_caged_for.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+            task_coletar_caged_exc.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes, codigo_ibge=codigo_ibge),
+            task_finalizar_coleta_caged.si(ano=ano, mes=mes),
+        )
+        async_result = ch.apply_async()
+        print(f"Coleta dos arquivos CAGED {ano}-{mes:02d} disparada: {async_result.id}")
+        return
+
+    # =========================
+    # MODO AUTOMÁTICO: intervalo de meses
+    # =========================
+    # 1. Último registro em SaldoMensalCaged
+    ultimo = SaldoMensalCaged.objects.aggregate(
+        ultimo_referencia=Max("referencia")
+    )["ultimo_referencia"]
+
+    if ultimo is None:
+        # Sem nenhum registro: define um ponto de partida (ajuste conforme sua regra)
+        ultimo = date(date.today().year, 1, 1)
+
+    # 2. Mês mais recente (já coletado)
+    mes_mais_recente = ultimo.replace(day=1)
+
+    # 3. Primeiro mês a processar = mês seguinte
+    data_inicio = mes_mais_recente + relativedelta(months=1)
+
+    # 4. Mês limite = mês atual - 3
+    hoje = date.today()
+    mes_atual_inicio = hoje.replace(day=1)
+    mes_limite = mes_atual_inicio - relativedelta(months=3)
+
+    # 5. Se o primeiro mês já for maior que o limite, não há nada a processar
+    if data_inicio > mes_limite:
+        print(
+            f"Não há meses para processar: "
+            f"primeiro_mês={data_inicio}, limite={mes_limite}"
+        )
+        return
+
+    # 6. Gerar lista de meses (ano, mes) entre data_inicio e mes_limite (inclusive)
+    meses_a_processar = []
+    current = data_inicio
+    while current <= mes_limite:
+        meses_a_processar.append((current.year, current.month))
+        current = current + relativedelta(months=1)
+
+    # 7. Construir uma chain única, onde cada elo é a chain de um mês
+    chain_de_meses = []
+    for ano, mes in meses_a_processar:
+        ch_mes = chain(
+            task_coletar_caged_mov.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+            task_coletar_caged_for.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+            task_coletar_caged_exc.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes, codigo_ibge=codigo_ibge),
+            task_finalizar_coleta_caged.si(ano=ano, mes=mes),
+        )
+        chain_de_meses.append(ch_mes)
+
+    # Chain geral: meses em sequência
+    chain_geral = chain(*chain_de_meses)
+    async_result = chain_geral.apply_async()
+
+    print(
+        f"Coleta CAGED em sequência disparada para os meses "
+        f"{meses_a_processar}: {async_result.id}"
+    )
+    
+    # @shared_task(
 #     bind=True,
 # )
 # def task_filtrar_caged(
@@ -701,424 +1131,3 @@ def task_baixar_caged(
 #         arquivoColetado.msg = str(e)
 #         arquivoColetado.save()
 #         raise
-    
-@shared_task(
-    bind=True,
-)
-def task_coletar_caged_mov(
-    self,
-    ano: int,
-    mes: int,
-):
-    
-    arquivo_nome = "CAGEDMOV"
-    data_referencia = f"{ano:04d}-{mes:02d}"
-    arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-            nome=arquivo_nome,
-            ano=ano,
-            mes=mes,
-        )
-    
-    arquivo_coletado.status = "PENDING"
-    arquivo_coletado.save()
-    
-    try:
-        baixar_caged(arquivoColetado=arquivo_coletado)    
-        
-        registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=True,
-            )
-        
-    except Exception as e:
-        arquivo_coletado.status = "FAILED"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        
-        registrar_log(
-            operacao="DOWNLOAD",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        
-        raise
-       
-    # id_arquivo_coletado = task_baixar_caged.apply(
-    #                         kwargs={
-    #                             'ano':ano,
-    #                             'mes':mes,
-    #                             'nome_arquivo_servidor':f"CAGEDMOV",
-    #                         }
-    #                     ).result
-    
-    # arquivo = ArquivoColetado.objects.get(id = id_arquivo_coletado)
-    
-    try:
-        filtrar_caged(arquivo_coletado)
-        
-        registrar_log(
-            operacao="FILTRO",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-        
-    except Exception as e:
-        print(e)
-        arquivo_coletado.status = "ERROR"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        
-        registrar_log(
-            operacao="FILTRO",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        raise
- 
-    try:
-        carregar_caged_mov(arquivo_coletado)
-        
-        registrar_log(
-            operacao="CARGA",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-        
-    except Exception as e:
-        print(e)
-        arquivo_coletado.status = "ERROR"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        
-        registrar_log(
-            operacao="CARGA",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        raise
-    
-
-@shared_task(
-    bind=True,
-)
-def task_coletar_caged_for(
-    self,
-    ano: int,
-    mes: int,
-):
-    arquivo_nome = "CAGEDFOR"
-    data_referencia = f"{ano:04d}-{mes:02d}"
-    arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-            nome=arquivo_nome,
-            ano=ano,
-            mes=mes,
-        )
-    
-    arquivo_coletado.status = "PENDING"
-    arquivo_coletado.save()
-    
-    try:
-        baixar_caged(arquivoColetado=arquivo_coletado)
-        
-        registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=True,
-            )
-            
-    except Exception as e:
-        
-        if(str(e).startswith("550")): # arquivo não encontrado
-            print(f"Arquivo CAGED FOR {ano}-{mes} não encontrado. Pulando etapa de coleta.")
-            
-            registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=False,
-                erro=f"{e} + Arquivo não encontrado. Pulando etapa de coleta.",
-            )
-            return None
-        else:
-            registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=False,
-                erro=str(e),
-            )
-            raise e        
-    
-    try:
-        filtrar_caged(arquivo_coletado)
-        
-        registrar_log(
-            operacao="FILTRO",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-    except Exception as e:
-        print(e)
-        arquivo_coletado.status = "ERROR"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        registrar_log(
-            operacao="FILTRO",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        raise
-    
-    try:
-        carregar_caged_for(arquivo_coletado)
-        registrar_log(
-            operacao="CARGA",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-    except Exception as e:
-        print(e)
-        arquivo_coletado.status = "ERROR"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        registrar_log(
-            operacao="CARGA",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        raise
-
-
-@shared_task(
-    bind=True,
-)
-def task_coletar_caged_exc(
-    self,
-    ano: int,
-    mes: int,
-):
-    arquivo_nome = "CAGEDEXC"
-    data_referencia = f"{ano:04d}-{mes:02d}"
-    arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
-            nome=arquivo_nome,
-            ano=ano,
-            mes=mes,
-        )
-    
-    arquivo_coletado.status = "PENDING"
-    arquivo_coletado.save()
-    
-    try:
-        baixar_caged(arquivoColetado=arquivo_coletado)
-        registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=True,
-            )
-    except Exception as e:
-        if(str(e).startswith("550")): # arquivo não encontrado
-            print(f"Arquivo CAGED EXC {ano}-{mes} não encontrado. Pulando etapa de coleta.")
-            registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=False,
-                erro=f"{e} + Arquivo não encontrado. Pulando etapa de coleta.",
-            )
-            return None
-        else:
-            registrar_log(
-                operacao="DOWNLOAD",
-                arquivo=arquivo_nome,
-                data_referencia=data_referencia,
-                sucesso=False,
-                erro=str(e),
-            )
-            raise e
-    
-    try:
-        filtrar_caged(arquivo_coletado)
-        registrar_log(
-            operacao="FILTRO",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-    except Exception as e:
-        print(e)
-        arquivo_coletado.status = "ERROR"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        registrar_log(
-            operacao="FILTRO",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        raise   
-
-    try:
-        carregar_caged_exc(arquivo_coletado)
-        registrar_log(
-            operacao="CARGA",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-    except Exception as e:
-        print(e)
-        arquivo_coletado.status = "ERROR"
-        arquivo_coletado.msg = str(e)
-        arquivo_coletado.save()
-        registrar_log(
-            operacao="CARGA",
-            arquivo=arquivo_nome,
-            data_referencia=data_referencia,
-            sucesso=False,
-            erro=str(e),
-        )
-        raise   
- 
-    
-@shared_task(
-    bind=True,
-)
-def task_carregar_saldos_mensais_temporarios(
-    self,
-    year:int,
-    month:int,
-):
-    data_referencia = f"{year:04d}-{month:02d}"
-    try:
-        carregar_saldos_mensais_temporarios(year, month)
-        registrar_log(
-            operacao="CARGA_SALDOS_MENS_TEMP",
-            arquivo="",
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-    except Exception as e:
-        print(e)
-        registrar_log(
-            operacao="CARGA_SALDOS_MENS_TEMP",
-            arquivo="",
-            data_referencia=data_referencia,
-            sucesso=True,
-        )
-        raise 
-
-
-@shared_task(
-    bind=True,
-)
-def task_finalizar_coleta_caged(
-        self,
-        ano: int,
-        mes: int,
-    ):
-    registrar_log(
-        operacao="FINALIZACAO",
-        arquivo="CAGED",
-        data_referencia=f"{ano:04d}-{mes:02d}",
-        sucesso=True,
-    )
-    print("Coleta dos arquivos CAGED finalizada.")
-
-
-@shared_task(bind=True)
-def task_coletar_arquivos_caged(self, **kwargs):
-    # =========================
-    # MODO MANUAL: ano/mes explícitos
-    # =========================
-    if "ano" in kwargs and "mes" in kwargs:
-        ano = kwargs["ano"]
-        mes = kwargs["mes"]
-
-        ch = chain(
-            task_coletar_caged_mov.si(ano=ano, mes=mes),
-            task_coletar_caged_for.si(ano=ano, mes=mes),
-            task_coletar_caged_exc.si(ano=ano, mes=mes),
-            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
-            task_finalizar_coleta_caged.si(ano=ano, mes=mes),
-        )
-        async_result = ch.apply_async()
-        print(f"Coleta dos arquivos CAGED {ano}-{mes:02d} disparada: {async_result.id}")
-        return
-
-    # =========================
-    # MODO AUTOMÁTICO: intervalo de meses
-    # =========================
-    # 1. Último registro em SaldoMensalCaged
-    ultimo = SaldoMensalCaged.objects.aggregate(
-        ultimo_referencia=Max("referencia")
-    )["ultimo_referencia"]
-
-    if ultimo is None:
-        # Sem nenhum registro: define um ponto de partida (ajuste conforme sua regra)
-        ultimo = date(date.today().year, 1, 1)
-
-    # 2. Mês mais recente (já coletado)
-    mes_mais_recente = ultimo.replace(day=1)
-
-    # 3. Primeiro mês a processar = mês seguinte
-    data_inicio = mes_mais_recente + relativedelta(months=1)
-
-    # 4. Mês limite = mês atual - 2
-    hoje = date.today()
-    mes_atual_inicio = hoje.replace(day=1)
-    mes_limite = mes_atual_inicio - relativedelta(months=2)
-
-    # 5. Se o primeiro mês já for maior que o limite, não há nada a processar
-    if data_inicio > mes_limite:
-        print(
-            f"Não há meses para processar: "
-            f"primeiro_mês={data_inicio}, limite={mes_limite}"
-        )
-        return
-
-    # 6. Gerar lista de meses (ano, mes) entre data_inicio e mes_limite (inclusive)
-    meses_a_processar = []
-    current = data_inicio
-    while current <= mes_limite:
-        meses_a_processar.append((current.year, current.month))
-        current = current + relativedelta(months=1)
-
-    # 7. Construir uma chain única, onde cada elo é a chain de um mês
-    chain_de_meses = []
-    for ano, mes in meses_a_processar:
-        ch_mes = chain(
-            task_coletar_caged_mov.si(ano=ano, mes=mes),
-            task_coletar_caged_for.si(ano=ano, mes=mes),
-            task_coletar_caged_exc.si(ano=ano, mes=mes),
-            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
-            task_finalizar_coleta_caged.si(ano=ano, mes=mes),
-        )
-        chain_de_meses.append(ch_mes)
-
-    # Chain geral: meses em sequência
-    chain_geral = chain(*chain_de_meses)
-    async_result = chain_geral.apply_async()
-
-    print(
-        f"Coleta CAGED em sequência disparada para os meses "
-        f"{meses_a_processar}: {async_result.id}"
-    )
