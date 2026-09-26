@@ -16,10 +16,10 @@ urlpatterns = [
     path("estoque_acumulado_paginado/", EstoqueAcumuladoPaginado.as_view()),
     
     # Rota para baixar o schema YAML/JSON
-    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    #path('schema/', SpectacularAPIView.as_view(), name='schema'),
     # Interface interativa do Swagger
-    path('docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    #path('docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     # Interface de leitura do Redoc (alternativa ao Swagger)
-    path('docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+   #path('docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 

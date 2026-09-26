@@ -165,10 +165,18 @@ h2 > a {
 }
 
 li > a {
-  color: #f0fdf4;
+  color: #166534; /* modo claro */
 }
 
-li > a:hover{
+li > a:hover {
+  color: #008232;
+}
+
+.dark li > a {
+  color: #f0fdf4; /* modo escuro */
+}
+
+.dark li > a:hover {
   color: #bbf7d0;
 }
 
