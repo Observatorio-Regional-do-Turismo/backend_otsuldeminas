@@ -275,6 +275,7 @@ def task_baixar_rais(
     self,
     ano: str,
     nome_arquivo_servidor : str,
+    codigo_ibge=None,
     ):
            
     arquivo_coletado, _ = ArquivoColetado.objects.get_or_create(
@@ -284,7 +285,7 @@ def task_baixar_rais(
     arquivo_coletado.status = "PENDING"
     arquivo_coletado.save()
     try:
-        baixar_rais(arquivoColetado=arquivo_coletado)      
+        baixar_rais(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge)      
     except Exception as e:
         arquivo_coletado.status = "FAILED"
         arquivo_coletado.msg = str(e)
@@ -371,7 +372,8 @@ def task_baixar_rais(
 )
 def task_coletar_vinc_pub(
     self,
-    ano: int
+    ano: int,
+    codigo_ibge=None,
     ):
     
     arquivo_nome = "RAIS_VINC_PUB_MG_ES_RJ.7z"
@@ -383,7 +385,7 @@ def task_coletar_vinc_pub(
     arquivo_coletado.save()
     
     try:
-        baixar_rais(arquivoColetado=arquivo_coletado) 
+        baixar_rais(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge) 
         registrar_log(
             operacao="DOWNLOAD",
             arquivo=arquivo_nome,
@@ -413,7 +415,7 @@ def task_coletar_vinc_pub(
     # arquivo = ArquivoColetado.objects.get(id=id_arquivo_coletado)
     
     try:
-        filtrar_vinc_pub(arquivo_coletado)
+        filtrar_vinc_pub(arquivo_coletado, codigo_ibge=codigo_ibge)
         registrar_log(
             operacao="FILTRO",
             arquivo=arquivo_nome,
@@ -435,7 +437,7 @@ def task_coletar_vinc_pub(
         raise
 
     try:
-        carregar_vinc_pub(arquivo_coletado)
+        carregar_vinc_pub(arquivo_coletado, codigo_ibge=codigo_ibge)
         registrar_log(
             operacao="CARGA",
             arquivo=arquivo_nome,
@@ -463,7 +465,8 @@ def task_coletar_vinc_pub(
 )
 def task_coletar_estab_pub(
     self,
-    ano: int
+    ano: int,
+    codigo_ibge=None,
     ):
     
     arquivo_nome = "RAIS_ESTAB_PUB.7z"
@@ -475,7 +478,7 @@ def task_coletar_estab_pub(
     arquivo_coletado.save()
     
     try:
-        baixar_rais(arquivoColetado=arquivo_coletado) 
+        baixar_rais(arquivoColetado=arquivo_coletado, codigo_ibge=codigo_ibge) 
         registrar_log(
             operacao="DOWNLOAD",
             arquivo=arquivo_nome,
@@ -496,7 +499,7 @@ def task_coletar_estab_pub(
         raise 
 
     try:
-        filtrar_estab_pub(arquivo_coletado)
+        filtrar_estab_pub(arquivo_coletado, codigo_ibge=codigo_ibge)
         registrar_log(
             operacao="FILTRO",
             arquivo=arquivo_nome,
@@ -518,7 +521,7 @@ def task_coletar_estab_pub(
         raise
     
     try:
-        carregar_estab_pub(arquivo_coletado)
+        carregar_estab_pub(arquivo_coletado, codigo_ibge=codigo_ibge)
         registrar_log(
             operacao="CARGA",
             arquivo=arquivo_nome,
@@ -544,10 +547,11 @@ def task_coletar_estab_pub(
 )
 def task_carregar_saldos_mensais(
     self,
-    ano: int
+    ano: int,
+    codigo_ibge=None,
     ):
     try:
-        carregar_saldos_mensais(ano)
+        carregar_saldos_mensais(ano, codigo_ibge=codigo_ibge)
         registrar_log(
             operacao="CARGA",
             arquivo="SALDOS_MENSAIS",
@@ -587,15 +591,17 @@ def task_coletar_arquivos_rais(
     self,
     **kwargs,
 ):
+    codigo_ibge = kwargs.get("codigo_ibge")
+    
     if "ano" in kwargs:
         ano = kwargs["ano"]
     else:
         ano = str(date.today().year)
         
     ch = chain(
-        task_coletar_vinc_pub.si(ano=ano),
-        task_coletar_estab_pub.si(ano=ano),
-        task_carregar_saldos_mensais.si(ano=ano),
+        task_coletar_vinc_pub.si(ano=ano, codigo_ibge=codigo_ibge),
+        task_coletar_estab_pub.si(ano=ano, codigo_ibge=codigo_ibge),
+        task_carregar_saldos_mensais.si(ano=ano, codigo_ibge=codigo_ibge),
         task_finalizar_coleta_rais.si(ano=ano),
     )
     async_result = ch.apply_async()
