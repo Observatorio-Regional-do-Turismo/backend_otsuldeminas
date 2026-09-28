@@ -1,37 +1,3 @@
-"""
-management/commands/nivelar_municipio_rais_caged.py
-
-Nivela UM único município (por código IBGE) contra toda a série histórica já
-existente na base: primeiro roda o RAIS ano a ano (do ano mais antigo ao mais
-recente já presentes na base, olhando EstoqueAnual/SaldoMensal em geral, não
-filtrado pelo município -- esses dados ainda não existem para a cidade nova,
-é justamente isso que estamos populando), e só depois roda o CAGED mês a mês,
-dos meses "adjacentes" que ficaram entre o último ano do RAIS e o mês mais
-recente já coletado do CAGED.
-
-Por que só 1 município por execução: conforme combinado, para não poluir a
-função com um for aninhado (RAIS anos x CAGED meses x municípios), o comando
-roda para um único codigo_ibge por chamada. Para várias cidades, rode o
-comando várias vezes (ou faça um wrapper simples que itera e chama este
-comando/celery para cada uma).
-
-Execução 100% linear: tudo roda dentro de uma ÚNICA chain do Celery
-(RAIS ano 1 -> RAIS ano 2 -> ... -> RAIS ano N -> CAGED mes 1 -> ... -> CAGED
-mes M -> finalização), pois cada etapa depende do estado deixado pela
-anterior:
-  - Dentro do RAIS: carregar_saldos_mensais(year) usa EstoqueAnual do
-    ano anterior (year - 1), então os anos têm que rodar em ordem.
-  - Entre RAIS e CAGED: quando o CAGED começa a rodar para o município novo,
-    ele precisa que o EstoqueMensal de dezembro do último ano RAIS já exista
-    (carregar_saldos_mensais_temporarios do CAGED olha o mês anterior).
-
-USO:
-    python manage.py nivelar_municipio_rais_caged --ibge 3170206
-
-    # Sem disparar de fato, só para inspecionar o plano de execução:
-    python manage.py nivelar_municipio_rais_caged --ibge 3170206 --dry-run
-"""
-
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
@@ -41,8 +7,18 @@ from django.db.models import Max, Min
 
 from rais.models import EstoqueAnual
 from caged.models import SaldoMensalCaged
-from rais.tasks import task_coletar_arquivos_rais
-from caged.tasks import task_coletar_arquivos_caged
+
+from etl.tasks import (
+    task_coletar_vinc_pub,
+    task_coletar_estab_pub,
+    task_carregar_saldos_mensais,
+    task_finalizar_coleta_rais,
+    task_coletar_caged_mov,
+    task_coletar_caged_for,
+    task_coletar_caged_exc,
+    task_carregar_saldos_mensais_temporarios,
+    task_finalizar_coleta_caged,
+)
 
 
 class Command(BaseCommand):
@@ -50,7 +26,7 @@ class Command(BaseCommand):
         "Nivela um único município (código IBGE) contra toda a série "
         "histórica: roda o RAIS ano a ano e, em seguida, o CAGED mês a mês "
         "para os meses posteriores ao último ano RAIS, em uma única chain "
-        "linear do Celery."
+        "linear (achatada) do Celery, usando diretamente as tasks atômicas."
     )
 
     def add_arguments(self, parser):
@@ -88,10 +64,6 @@ class Command(BaseCommand):
         )
 
     def _descobrir_anos_rais(self):
-        """
-        Intervalo de anos já cobertos pela base RAIS (olhando a base como um
-        todo, não o município novo -- que ainda não tem nenhum registro).
-        """
         limites = EstoqueAnual.objects.aggregate(
             ano_min=Min("referencia"),
             ano_max=Max("referencia"),
@@ -104,10 +76,6 @@ class Command(BaseCommand):
         return list(range(ano_inicio, ano_fim + 1))
 
     def _descobrir_meses_caged_adjacentes(self, ano_final_rais):
-        """
-        Meses de CAGED entre janeiro do ano seguinte ao último ano do RAIS
-        e o mês/ano mais recente já coletado de CAGED (base como um todo).
-        """
         referencia_caged = SaldoMensalCaged.objects.aggregate(
             ultima=Max("referencia")
         )["ultima"]
@@ -131,15 +99,27 @@ class Command(BaseCommand):
     def _disparar_chain(self, codigo_ibge, anos_rais, meses_caged):
         etapas = []
 
+        # RAIS: cada ano vira 4 elos atômicos em sequência (a mesma sequência
+        # que task_coletar_arquivos_rais monta internamente, só que agora
+        # como parte de UMA chain externa só, ligada de verdade).
         for ano in anos_rais:
-            etapas.append(
-                task_coletar_arquivos_rais.si(ano=ano, codigo_ibge=codigo_ibge)
-            )
+            etapas.extend([
+                task_coletar_vinc_pub.si(ano=ano, codigo_ibge=codigo_ibge),
+                task_coletar_estab_pub.si(ano=ano, codigo_ibge=codigo_ibge),
+                task_carregar_saldos_mensais.si(ano=ano, codigo_ibge=codigo_ibge),
+                task_finalizar_coleta_rais.si(ano=ano),
+            ])
 
+        # CAGED: cada mês vira 5 elos atômicos em sequência (mesma sequência
+        # que task_coletar_arquivos_caged monta internamente).
         for ano, mes in meses_caged:
-            etapas.append(
-                task_coletar_arquivos_caged.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge)
-            )
+            etapas.extend([
+                task_coletar_caged_mov.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+                task_coletar_caged_for.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+                task_coletar_caged_exc.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
+                task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes, codigo_ibge=codigo_ibge),
+                task_finalizar_coleta_caged.si(ano=ano, mes=mes),
+            ])
 
         if not etapas:
             raise CommandError("Nenhuma etapa (RAIS ou CAGED) a executar para este município.")

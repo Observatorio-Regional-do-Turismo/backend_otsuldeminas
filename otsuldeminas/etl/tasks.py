@@ -6,6 +6,7 @@ from .services.receita_federal import baixar_arquivo_rf, extrair_arquivo_rf, fil
 from .services.rais import baixar_rais, filtrar_vinc_pub, carregar_vinc_pub, filtrar_estab_pub, carregar_estab_pub, carregar_saldos_mensais
 from .services.caged import baixar_caged, filtrar_caged, carregar_caged_mov, carregar_caged_for, carregar_caged_exc, carregar_saldos_mensais_temporarios
 from .models import ArquivoColetado
+from rais.models import EstoqueMensal, EstoqueAnual, SaldoMensal
 from .utils import registrar_log
 from caged.models import SaldoMensalCaged
 from datetime import date
@@ -594,18 +595,23 @@ def task_coletar_arquivos_rais(
     codigo_ibge = kwargs.get("codigo_ibge")
     
     if "ano" in kwargs:
-        ano = kwargs["ano"]
+        ano = int(kwargs["ano"])
     else:
-        ano = str(date.today().year)
-        
-    ch = chain(
-        task_coletar_vinc_pub.si(ano=ano, codigo_ibge=codigo_ibge),
-        task_coletar_estab_pub.si(ano=ano, codigo_ibge=codigo_ibge),
-        task_carregar_saldos_mensais.si(ano=ano, codigo_ibge=codigo_ibge),
-        task_finalizar_coleta_rais.si(ano=ano),
-    )
-    async_result = ch.apply_async()
-    print(f"Coleta dos arquivos RAIS {ano} disparada: {async_result.id}")
+        ano = date.today().year - 2
+    
+    modelos = [EstoqueAnual, SaldoMensal, EstoqueMensal]
+    if any(modelo.objects.filter(referencia__year=ano).exists() for modelo in modelos):
+        print(f"Já existem dados do rais para o ano {ano}.")
+        return
+    else: 
+        ch = chain(
+            task_coletar_vinc_pub.si(ano=ano, codigo_ibge=codigo_ibge),
+            task_coletar_estab_pub.si(ano=ano, codigo_ibge=codigo_ibge),
+            task_carregar_saldos_mensais.si(ano=ano, codigo_ibge=codigo_ibge),
+            task_finalizar_coleta_rais.si(ano=ano),
+        )
+        async_result = ch.apply_async()
+        print(f"Coleta dos arquivos RAIS {ano} disparada: {async_result.id}")
 
 
 @shared_task(
@@ -1049,10 +1055,10 @@ def task_coletar_arquivos_caged(self, **kwargs):
     chain_de_meses = []
     for ano, mes in meses_a_processar:
         ch_mes = chain(
-            task_coletar_caged_mov.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
-            task_coletar_caged_for.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
-            task_coletar_caged_exc.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
-            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes, codigo_ibge=codigo_ibge),
+            task_coletar_caged_mov.si(ano=ano, mes=mes),
+            task_coletar_caged_for.si(ano=ano, mes=mes),
+            task_coletar_caged_exc.si(ano=ano, mes=mes),
+            task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes),
             task_finalizar_coleta_caged.si(ano=ano, mes=mes),
         )
         chain_de_meses.append(ch_mes)

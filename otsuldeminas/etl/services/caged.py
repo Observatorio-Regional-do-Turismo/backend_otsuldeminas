@@ -144,7 +144,7 @@ def filtrar_caged(arquivoColetado: ArquivoColetado, codigo_ibge=None):
             break
 
     print(f"filtrou {linhas_filtradas} linhas")
-    if linhas_filtradas == 0:
+    if linhas_filtradas == 0 and arquivoColetado.nome.startswith("CAGEDMOV"):
         raise RuntimeError(f"Nenhuma linha filtrada para o arquivo {nome}.")
 
     os.remove(arquivoColetado.path_extraido)
@@ -264,7 +264,7 @@ def carregar_caged_exc(arquivoColetado: ArquivoColetado, codigo_ibge=None):
 def carregar_saldos_mensais_temporarios(year: int, month: int, codigo_ibge=None):
     codigos_ibge = _normalizar_ibge(codigo_ibge)
 
-    ano_estoque_anual_mais_recente = EstoqueAnual.objects.order_by("-referencia").first().referencia.year
+    #ano_estoque_anual_mais_recente = EstoqueAnual.objects.order_by("-referencia").first().referencia.year
     mes_atual = gerar_ultimo_dia(year, month)
     if month == 1:
         mes_anterior = date(year - 1, 12, 31)
@@ -285,4 +285,4 @@ def carregar_saldos_mensais_temporarios(year: int, month: int, codigo_ibge=None)
             qtd = estoque.estoque + saldo.saldo_caged
             EstoqueMensal.objects.create(municipio=estoque.municipio, cnae=estoque.cnae, referencia=mes_atual, estoque=qtd)
     else:
-        return "O ano passado eh menor do que o rais atual ou nao ha estoque para o mes anterior"
+        raise RuntimeError("O ano passado eh menor do que o rais atual ou nao ha estoque para o mes anterior") 

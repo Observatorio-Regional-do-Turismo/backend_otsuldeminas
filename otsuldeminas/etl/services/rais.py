@@ -390,7 +390,7 @@ def carregar_saldos_mensais(year: int, codigo_ibge=None):
             )
         return
 
-    #qtd = None
+    qtd = None
     for estoque in estoques_anuais:
         for mes in range(1, 13):
             data = gerar_ultimo_dia(year, mes)
