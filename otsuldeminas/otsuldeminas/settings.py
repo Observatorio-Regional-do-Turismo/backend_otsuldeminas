@@ -130,6 +130,89 @@ CELERY_BEAT_SCHEDULE = {
         "task": "etl.tasks.task_coletar_indicadores_ibge",
         "schedule": crontab(day_of_month=1, hour=3, minute=0),
     },
+    "collect-rf-monthly-0": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=2, hour=0, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos0.zip",
+        },
+    },
+    "collect-rf-monthly-1": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=2, hour=3, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos1.zip",
+        },
+    },
+    "collect-rf-monthly-2": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=2, hour=5, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos2.zip",
+        },
+    },
+    "collect-rf-monthly-3": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=3, hour=0, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos3.zip",
+        },
+    },
+    "collect-rf-monthly-4": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=3, hour=2, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos4.zip",
+        },
+    },
+    "collect-rf-monthly-5": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=3, hour=4, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos5.zip",
+        },
+    },
+    "collect-rf-monthly-6": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=4, hour=0, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos6.zip",
+        },
+    },
+    "collect-rf-monthly-7": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=4, hour=2, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos7.zip",
+        },
+    },
+        "collect-rf-monthly-8": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=4, hour=4, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos8.zip",
+        },
+    },
+    "collect-rf-monthly-9": {
+        "task": "etl.tasks.task_coletar_arquivo_rf",
+        "schedule": crontab(day_of_month=5, hour=0, minute=0),
+        "kwargs": {
+            "nome_arquivo_servidor": "Estabelecimentos9.zip",
+        },
+    },
+    "collect-caged-monthly": {
+        "task": "etl.tasks.task_coletar_arquivos_caged",
+        "schedule": crontab(day_of_month=8, hour=0, minute=0),
+    },
+    "collect-rais-annually": {
+    "task": "etl.tasks,task_coletar_arquivos_rais",
+    "schedule": crontab(
+        minute=0,
+        hour=3,
+        day_of_month=10,
+        month_of_year="2,3,4",
+    ),
+},
 }
 
 

@@ -231,12 +231,8 @@ def task_coletar_arquivo_rf(
     if "data" in kwargs:
         ano_mes = kwargs["data"]
     else:
-        ano_mes = str(date.today())[0:7] # '2025-07'
-    
-    # id_arquivo_coletado = task_baixar_arquivo_rf(
-    #                         nome_arquivo_servidor=nome_arquivo_servidor,
-    #                         ano_mes=ano_mes,
-    #                     )
+        ano_mes = str(date.today() - relativedelta(months=2))[0:7]
+        #ano_mes = str(date.today())[0:7] # '2025-07'
     
     ch = chain(
         task_baixar_arquivo_rf.s(nome_arquivo_servidor=nome_arquivo_servidor, ano_mes=ano_mes),
