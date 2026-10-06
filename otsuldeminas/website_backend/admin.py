@@ -16,7 +16,7 @@ class ImagemInline(GenericTabularInline):
 class ContatoInline(GenericTabularInline):
   model = Contato
   extra = 1
-  fields = ("type", "label", "value", "address", "latitude", "longitude", "order")
+  fields = ("type", "label", "value", "latitude", "longitude", "order")
   ordering = ("order",)
 
 

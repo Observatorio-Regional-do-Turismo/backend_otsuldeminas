@@ -5,7 +5,7 @@ from celery import chain
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Max, Min
 
-from rais.models import EstoqueAnual
+from rais.models import EstoqueAnual, EstoqueMensal, SaldoMensal
 from caged.models import SaldoMensalCaged
 
 from etl.tasks import (
@@ -31,37 +31,83 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--ibge",
-            required=True,
-            type=str,
-            help="Código IBGE do município a nivelar (um único município por execução).",
+        "--ibge",
+        required=True,
+        nargs="+",
+        type=str,
+        help="Um ou mais códigos IBGE dos municípios a nivelar.",
         )
         parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Apenas exibe o plano de execução (anos RAIS e meses CAGED), sem disparar nada.",
         )
-
+    
     def handle(self, *args, **options):
-        codigo_ibge = options["ibge"]
+        codigos_ibge = list(dict.fromkeys(options["ibge"]))
 
         anos_rais = self._descobrir_anos_rais()
-        meses_caged = self._descobrir_meses_caged_adjacentes(ano_final_rais=anos_rais[-1])
+        meses_caged = self._descobrir_meses_caged_adjacentes(
+            ano_final_rais=anos_rais[-1]
+        )
 
-        self.stdout.write(f"Município: {codigo_ibge}")
-        self.stdout.write(f"Anos RAIS a processar (em ordem): {anos_rais}")
-        self.stdout.write(f"Meses CAGED a processar (em ordem): {meses_caged}")
+        self.stdout.write(f"Municípios: {codigos_ibge}")
+        self.stdout.write(f"Anos RAIS a processar: {anos_rais}")
+        self.stdout.write(f"Meses CAGED a processar: {meses_caged}")
 
         if options["dry_run"]:
-            self.stdout.write(self.style.WARNING("Dry-run: nenhuma task disparada."))
+            self.stdout.write(
+                self.style.WARNING("Dry-run: nenhuma task disparada.")
+            )
             return
+        
+        self._validar_municipios_sem_dados(codigos_ibge)
 
-        async_result = self._disparar_chain(codigo_ibge, anos_rais, meses_caged)
+        async_result = self._disparar_chain(
+            codigos_ibge, anos_rais, meses_caged
+        )
         self.stdout.write(
             self.style.SUCCESS(
-                f"Chain de nivelamento disparada para o município {codigo_ibge}: {async_result.id}"
+                f"Chain de nivelamento disparada para {codigos_ibge}: "
+                f"{async_result.id}"
             )
         )
+    
+    def _validar_municipios_sem_dados(self, codigos_ibge):
+        modelos = (
+            EstoqueAnual,
+            EstoqueMensal,
+            SaldoMensal,
+            SaldoMensalCaged,
+        )
+
+        encontrados = {}
+
+        for modelo in modelos:
+            codigos_com_dados = (
+                modelo.objects
+                .filter(municipio_id__in=codigos_ibge)
+                .values_list("municipio_id", flat=True)
+                .distinct()
+            )
+
+            for codigo in codigos_com_dados:
+                encontrados.setdefault(codigo, []).append(
+                    modelo._meta.verbose_name
+                )
+
+        if encontrados:
+            detalhes = "; ".join(
+                f"{codigo}: {', '.join(modelos_encontrados)}"
+                for codigo, modelos_encontrados in sorted(encontrados.items())
+            )
+
+            raise CommandError(
+                "Nivelamento não iniciado. Há municípios com dados "
+                "já existentes: "
+                f"{detalhes}. "
+                "Execute a limpeza desses municípios antes de nivelar."
+            )
 
     def _descobrir_anos_rais(self):
         limites = EstoqueAnual.objects.aggregate(
@@ -96,32 +142,43 @@ class Command(BaseCommand):
             atual += relativedelta(months=1)
         return meses
 
-    def _disparar_chain(self, codigo_ibge, anos_rais, meses_caged):
+    def _disparar_chain(self, codigos_ibge, anos_rais, meses_caged):
         etapas = []
 
-        # RAIS: cada ano vira 4 elos atômicos em sequência (a mesma sequência
-        # que task_coletar_arquivos_rais monta internamente, só que agora
-        # como parte de UMA chain externa só, ligada de verdade).
         for ano in anos_rais:
             etapas.extend([
-                task_coletar_vinc_pub.si(ano=ano, codigo_ibge=codigo_ibge),
-                task_coletar_estab_pub.si(ano=ano, codigo_ibge=codigo_ibge),
-                task_carregar_saldos_mensais.si(ano=ano, codigo_ibge=codigo_ibge),
+                task_coletar_vinc_pub.si(
+                    ano=ano, codigo_ibge=codigos_ibge
+                ),
+                task_coletar_estab_pub.si(
+                    ano=ano, codigo_ibge=codigos_ibge
+                ),
+                task_carregar_saldos_mensais.si(
+                    ano=ano, codigo_ibge=codigos_ibge
+                ),
                 task_finalizar_coleta_rais.si(ano=ano),
             ])
 
-        # CAGED: cada mês vira 5 elos atômicos em sequência (mesma sequência
-        # que task_coletar_arquivos_caged monta internamente).
         for ano, mes in meses_caged:
             etapas.extend([
-                task_coletar_caged_mov.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
-                task_coletar_caged_for.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
-                task_coletar_caged_exc.si(ano=ano, mes=mes, codigo_ibge=codigo_ibge),
-                task_carregar_saldos_mensais_temporarios.si(year=ano, month=mes, codigo_ibge=codigo_ibge),
+                task_coletar_caged_mov.si(
+                    ano=ano, mes=mes, codigo_ibge=codigos_ibge
+                ),
+                task_coletar_caged_for.si(
+                    ano=ano, mes=mes, codigo_ibge=codigos_ibge
+                ),
+                task_coletar_caged_exc.si(
+                    ano=ano, mes=mes, codigo_ibge=codigos_ibge
+                ),
+                task_carregar_saldos_mensais_temporarios.si(
+                    year=ano, month=mes, codigo_ibge=codigos_ibge
+                ),
                 task_finalizar_coleta_caged.si(ano=ano, mes=mes),
             ])
 
         if not etapas:
-            raise CommandError("Nenhuma etapa (RAIS ou CAGED) a executar para este município.")
+            raise CommandError(
+                "Nenhuma etapa (RAIS ou CAGED) a executar."
+            )
 
         return chain(*etapas).apply_async()

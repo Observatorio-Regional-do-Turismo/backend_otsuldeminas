@@ -69,7 +69,7 @@ class Contato(models.Model):
     indexes = [models.Index(fields=["content_type", "object_id"])]
 
   def __str__(self):
-    return f"{self.get_type_display()}: {self.value or self.address}"
+    return f"{self.get_type_display()}: {self.value}"
 
 
 # ESTADOS ==============================================================================================================

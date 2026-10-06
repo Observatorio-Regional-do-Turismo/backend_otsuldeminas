@@ -1,0 +1,41 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <p>
+    Você está prestes a excluir dados RAIS/CAGED dos seguintes municípios.
+    Os cadastros dos municípios não serão excluídos.
+  </p>
+
+  <ul>
+    {% for municipio in municipios %}
+      <li>{{ municipio }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2>Registros encontrados</h2>
+  <ul>
+    {% for modelo, quantidade in contagens %}
+      <li>{{ modelo }}: {{ quantidade }}</li>
+    {% endfor %}
+  </ul>
+
+  <form method="post">
+    {% csrf_token %}
+
+    {% for codigo in codigos_ibge %}
+      <input
+        type="hidden"
+        name="{{ action_checkbox_name }}"
+        value="{{ codigo }}"
+      >
+    {% endfor %}
+
+    <input type="hidden" name="action" value="{{ action_name }}">
+    <input type="hidden" name="confirmar_limpeza" value="sim">
+
+    <button type="submit" class="default">
+      Sim, excluir esses dados
+    </button>
+    <a href="../">Cancelar</a>
+  </form>
+{% endblock %}
