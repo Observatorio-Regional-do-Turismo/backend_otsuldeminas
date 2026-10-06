@@ -56,6 +56,7 @@ def collect_city_indicators(cidade: Cidade, *, request_get: Callable[..., reques
 	if not cidade.ibge_code:
 		return
 
+	cidade_data, _ = CidadeData.objects.get_or_create(cidade=cidade)
 	values = {}
 	for field_name, indicator in INDICATORS.items():
 		if indicator is None:
@@ -71,4 +72,6 @@ def collect_city_indicators(cidade: Cidade, *, request_get: Callable[..., reques
 			print(f"Unable to extract values of {field_name} for {cidade.name}")
 
 	if values:
-		CidadeData.objects.update_or_create(cidade=cidade, defaults=values)
+		for field_name, value in values.items():
+			setattr(cidade_data, field_name, value)
+		cidade_data.save(update_fields=values.keys())
