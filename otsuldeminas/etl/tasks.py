@@ -260,8 +260,12 @@ def task_teste(**kwargs):
     retry_jitter=True,
     retry_kwargs={"max_retries": 5},
 )
-def task_coletar_indicadores_ibge(self):
-    for cidade in Cidade.objects.exclude(ibge_code__isnull=True).exclude(ibge_code=""):
+def task_coletar_indicadores_ibge(self, cidade_id: int | None = None):
+    cidades = Cidade.objects.exclude(ibge_code__isnull=True).exclude(ibge_code="")
+    if cidade_id is not None:
+        cidades = cidades.filter(pk=cidade_id)
+
+    for cidade in cidades:
         collect_city_indicators(cidade)
 
 

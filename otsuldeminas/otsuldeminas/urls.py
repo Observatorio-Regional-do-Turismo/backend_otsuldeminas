@@ -11,6 +11,7 @@ urlpatterns = [
     path('api-auth/', include('rest_framework.urls')),
     path('api/', include('api.urls')),
     path('backend/', include('website_backend.urls')),
+  	path('ckeditor5/', include('django_ckeditor_5.urls')),
 		
 		# SWAGGER
     path('schema/', SpectacularAPIView.as_view(), name='backend-schema'),

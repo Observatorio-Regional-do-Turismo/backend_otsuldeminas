@@ -3,13 +3,14 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
+from django_ckeditor_5.fields import CKEditor5Field
 
 
 # INFORMAÇÕES BASICAS ==================================================================================================
 class InformacaoBasica(models.Model):
   name = models.CharField(max_length=255)
   slug = models.SlugField(max_length=255)
-  description = models.TextField(blank=True)
+  description = CKEditor5Field(config_name="default", blank=True)
 
   class Meta:
     abstract = True

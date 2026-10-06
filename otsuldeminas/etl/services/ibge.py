@@ -3,16 +3,34 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlencode
 import requests
-from website_backend.models import Cidade
+from website_backend.models import Cidade, CidadeData
 
 
 IBGE_API_URL = "https://servicodados.ibge.gov.br/api/v3/agregados"
 
 INDICATORS = {
-	"pib": {"aggregate": 5938, "variable": 37},
-	"populacao": {"aggregate": 4714, "variable": 93},
-	"hospedagens": {"aggregate": 6589, "variable": 1321},
-	"restaurantes": {"aggregate": 9528, "variable": 706, "classificacao": "12762[117550]",},
+    "populacao": {"aggregate": 4714, "variable": 93},
+    "pib": {"aggregate": 5938, "variable": 37},
+    "pib_per_capta": {"aggregate": 5938, "variable": 38},
+    "area_territorial": {"aggregate": 1301, "variable": 615},
+    "area": {"aggregate": 1301, "variable": 615},
+    "densidade_demografica": {"aggregate": 1298, "variable": 29},
+    "densidade": {"aggregate": 1298, "variable": 29},
+    "taxa_escolarizacao": {"aggregate": 1388, "variable": 1000062},
+    "escolarizacao": {"aggregate": 1388, "variable": 1000062},
+    "hospedagens": {"aggregate": 6589, "variable": 1321, "classificacao": "12762[117549]"},
+    "restaurantes": {"aggregate": 9528, "variable": 706, "classificacao": "12762[117550]"},
+    "leitos": {"aggregate": 6589, "variable": 1321, "classificacao": "12762[117549]"},
+    "munic": {"aggregate": 1329, "variable": 1000093},
+    "indicador_cultural_munic": {"aggregate": 1329, "variable": 1000093},
+    "munic_cultura": {"aggregate": 1329, "variable": 1000093},
+    "pnad": {"aggregate": 4092, "variable": 1635},
+    "estatistica_pnad": {"aggregate": 4092, "variable": 1635},
+    "pnad_rendimento": {"aggregate": 4093, "variable": 4090},
+    "pnad_ocupacao": {"aggregate": 4093, "variable": 4090},
+    # IDH / IDHM não estão presentes na API do IBGE Agregados
+    "idh": None,
+    "idhm": None,
 }
 
 
@@ -40,6 +58,8 @@ def collect_city_indicators(cidade: Cidade, *, request_get: Callable[..., reques
 
 	values = {}
 	for field_name, indicator in INDICATORS.items():
+		if indicator is None:
+			continue
 		try:
 			response = request_get(_build_url(indicator, cidade.ibge_code), timeout=30)
 			response.raise_for_status()
@@ -50,4 +70,5 @@ def collect_city_indicators(cidade: Cidade, *, request_get: Callable[..., reques
 		except (Exception) as exc:
 			print(f"Unable to extract values of {field_name} for {cidade.name}")
 
-	Cidade.objects.filter(pk=cidade.pk).update(**values)
+	if values:
+		CidadeData.objects.update_or_create(cidade=cidade, defaults=values)

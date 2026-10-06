@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'django_extensions',
+    'django_ckeditor_5',
     'etl',
     'rais',
     'cadastros',
@@ -220,6 +221,26 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+CKEDITOR_5_CONFIGS = {
+    "default": {
+        "toolbar": [
+            "heading",
+            "|",
+            "bold",
+            "italic",
+            "underline",
+            "link",
+            "bulletedList",
+            "numberedList",
+            "blockQuote",
+            "insertTable",
+            "undo",
+            "redo",
+        ],
+        "language": {"ui": "pt-br", "content": "pt-br"},
+    },
 }
 
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
