@@ -97,7 +97,7 @@ class Estado(InformacaoBasica):
     return self.contact_relations.all()
 
 
-# IGRs ==============================================================================================================
+# IGRs =================================================================================================================
 class IGR(InformacaoBasica):
   id = models.BigAutoField(primary_key=True)
   
@@ -241,7 +241,7 @@ class PontoTuristico(InformacaoBasica):
     return self.contact_relations.all()
 
 
-# GESTOR CIDADE =============================================================================================================
+# GESTOR CIDADE ========================================================================================================
 class GestorCidade(models.Model):
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gestor_cidade")
   
@@ -255,7 +255,7 @@ class GestorCidade(models.Model):
     return f"{self.user} → {self.cidade}"
 
 
-# GESTOR IGR =============================================================================================================
+# GESTOR IGR ===========================================================================================================
 class GestorIGR(models.Model):
 	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="gestor_igr")
 	
@@ -267,3 +267,22 @@ class GestorIGR(models.Model):
 	
 	def __str__(self):
 		return f"{self.user} → {self.igr}"
+
+
+# NOTÍCIAS =============================================================================================================
+class Noticia(InformacaoBasica):
+	id = models.BigAutoField(primary_key=True)
+	
+	title = models.CharField(max_length=255)
+	slug = models.SlugField(max_length=255)
+	summary = CKEditor5Field(config_name="default", blank=True)
+	tags =
+	source_url = models.CharField(max_length=500)
+	published_at = models.DateTimeField(auto_now_add=True)
+	is_featured = models.BooleanField(default=False)
+	
+	cidade = models.ForeignKey(Cidade, on_delete=models.CASCADE, related_name="gestores")
+	igr = models.ForeignKey(IGR, on_delete=models.CASCADE, related_name="gestores")
+	author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="noticias")
+	image_relations = GenericRelation(Imagem, related_query_name="ponto_turistico")
+
