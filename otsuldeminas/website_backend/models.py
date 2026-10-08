@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
 from django_ckeditor_5.fields import CKEditor5Field
+from django.utils import timezone
 
 
 # INFORMAÇÕES BASICAS ==================================================================================================
@@ -270,19 +271,35 @@ class GestorIGR(models.Model):
 
 
 # NOTÍCIAS =============================================================================================================
-class Noticia(InformacaoBasica):
-	id = models.BigAutoField(primary_key=True)
-	
-	title = models.CharField(max_length=255)
-	slug = models.SlugField(max_length=255)
-	summary = CKEditor5Field(config_name="default", blank=True)
-	tags =
-	source_url = models.CharField(max_length=500)
-	published_at = models.DateTimeField(auto_now_add=True)
-	is_featured = models.BooleanField(default=False)
-	
-	cidade = models.ForeignKey(Cidade, on_delete=models.CASCADE, related_name="gestores")
-	igr = models.ForeignKey(IGR, on_delete=models.CASCADE, related_name="gestores")
-	author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="noticias")
-	image_relations = GenericRelation(Imagem, related_query_name="ponto_turistico")
+class Noticia(models.Model):
+  id = models.BigAutoField(primary_key=True)
+  title = models.CharField(max_length=255)
+  slug = models.SlugField(max_length=255, unique=True)
+  summary = models.TextField(blank=True)
+  content = CKEditor5Field(config_name="default", blank=True)
+  published_at = models.DateTimeField(default=timezone.now)
+  is_featured = models.BooleanField(default=False)
+  category = models.CharField(max_length=100, blank=True)
+  author = models.CharField(max_length=255, blank=True)
+  source_url = models.URLField(max_length=500, blank=True)
+  tags = models.JSONField(default=list, blank=True)
 
+  cidade = models.ForeignKey(
+    Cidade, on_delete=models.SET_NULL, null=True, blank=True, related_name="noticias"
+  )
+  igr = models.ForeignKey(
+    IGR, on_delete=models.SET_NULL, null=True, blank=True, related_name="noticias"
+  )
+  image_relations = GenericRelation(Imagem, related_query_name="noticia")
+
+  class Meta:
+    verbose_name = "Notícia"
+    verbose_name_plural = "Notícias"
+    ordering = ["-published_at", "-id"]
+
+  def __str__(self):
+    return self.title
+
+  @property
+  def imagens(self):
+    return self.image_relations.all()

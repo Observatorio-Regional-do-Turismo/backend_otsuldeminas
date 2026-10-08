@@ -1,7 +1,7 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 from django.contrib.contenttypes.admin import GenericTabularInline
-from .models import Cidade, Contato, Estado, Evento, GestorCidade, Imagem, PontoTuristico, IGR, CidadeData
+from .models import Cidade, Contato, Estado, Evento, GestorCidade, Imagem, Noticia, PontoTuristico, IGR, CidadeData
 
 
 # IMAGENS ==============================================================================================================
@@ -175,6 +175,18 @@ class PontoTuristicoAdmin(CityScopedAdminMixin, ModelAdmin):
     if cidade is not None:
       obj.cidade = cidade
     super().save_model(request, obj, form, change)
+
+
+# NOTÍCIAS =============================================================================================================
+@admin.register(Noticia)
+class NoticiaAdmin(ModelAdmin):
+  list_display = ("title", "published_at", "is_featured", "cidade", "igr")
+  list_filter = ("is_featured", "category", "cidade__state", "igr")
+  search_fields = ("title", "summary", "author")
+  prepopulated_fields = {"slug": ("title",)}
+  autocomplete_fields = ("cidade", "igr")
+  date_hierarchy = "published_at"
+  inlines = [ImagemInline]
 
 
 # GESTORES =============================================================================================================

@@ -1,8 +1,8 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
-from .models import Cidade, Estado, Evento, PontoTuristico, IGR
-from .serializers import CidadeDetailSerializer, CidadeSerializer, EstadoSerializer, EventoSerializer, PontoTuristicoSerializer, IGRSerializer
-from .filters import CidadeFilter, EstadoFilter, EventoFilter, IGRFilter, PontoTuristicoFilter
+from .models import Cidade, Estado, Evento, Noticia, PontoTuristico, IGR
+from .serializers import CidadeDetailSerializer, CidadeSerializer, EstadoSerializer, EventoSerializer, NoticiaSerializer, PontoTuristicoSerializer, IGRSerializer
+from .filters import CidadeFilter, EstadoFilter, EventoFilter, IGRFilter, NoticiaFilter, PontoTuristicoFilter
 
 
 # ESTADOS ==============================================================================================================
@@ -53,3 +53,14 @@ class PontoTuristicoViewSet(viewsets.ReadOnlyModelViewSet):
   filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
   filterset_class = PontoTuristicoFilter
   ordering_fields = ["cidade", "name"]
+
+
+# NOTÍCIAS =============================================================================================================
+class NoticiaViewSet(viewsets.ReadOnlyModelViewSet):
+  queryset = Noticia.objects.select_related("cidade", "igr", "cidade__state").prefetch_related("image_relations").all()
+  serializer_class = NoticiaSerializer
+  filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+  filterset_class = NoticiaFilter
+  search_fields = ["title", "summary", "content", "category", "author"]
+  ordering_fields = ["published_at", "title"]
+  ordering = ["-published_at", "-id"]

@@ -75,3 +75,11 @@ Acesse: http://localhost:8000/admin
 - Orientação: Straus Michalsky
 - Instituição: IFSULDEMINAS - Campus Poços de Caldas
 - Curso: Engenharia de Computação
+
+
+docker compose exec -t django uv run python manage.py create_manager cidade <usuario> <email> <slug-da-cidade>
+uv run python manage.py create_manager igr <usuario> <email> <slug-da-igr>
+
+gestor_pocos
+1234@Abcd
+teste@gmail.com
